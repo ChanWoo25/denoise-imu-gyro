@@ -157,22 +157,22 @@ class BaseDataset(Dataset):
 
     @staticmethod
     def interpolate(x, t, t_int):
-            """
-            Interpolate ground truth at the sensor timestamps
-            """
+        """
+        Interpolate ground truth at the sensor timestamps
+        """
 
-            # vector interpolation
-            x_int = np.zeros((t_int.shape[0], x.shape[1]))
-            for i in range(x.shape[1]):
-                if i in [4, 5, 6, 7]:
-                    continue
-                x_int[:, i] = np.interp(t_int, t, x[:, i])
-            # quaternion interpolation
-            t_int = torch.Tensor(t_int - t[0])
-            t = torch.Tensor(t - t[0])
-            qs = SO3.qnorm(torch.Tensor(x[:, 4:8]))
-            x_int[:, 4:8] = SO3.qinterp(qs, t, t_int).numpy()
-            return x_int
+        # vector interpolation
+        x_int = np.zeros((t_int.shape[0], x.shape[1]))
+        for i in range(x.shape[1]):
+            if i in [4, 5, 6, 7]:
+                continue
+            x_int[:, i] = np.interp(t_int, t, x[:, i])
+        # quaternion interpolation
+        t_int = torch.Tensor(t_int - t[0])
+        t = torch.Tensor(t - t[0])
+        qs = SO3.qnorm(torch.Tensor(x[:, 4:8]))
+        x_int[:, 4:8] = SO3.qinterp(qs, t, t_int).numpy()
+        return x_int
 
 
 class EUROCDataset(BaseDataset):
@@ -261,6 +261,7 @@ class EUROCDataset(BaseDataset):
                 'ps': p_gt.float(),
             }
             pdump(mondict, self.predata_dir, sequence + "_gt.p")
+
 
 
 class TUMVIDataset(BaseDataset):

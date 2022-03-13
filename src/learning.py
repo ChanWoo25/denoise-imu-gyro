@@ -1,4 +1,5 @@
 
+from email import header
 import torch
 import time
 import matplotlib.pyplot as plt
@@ -112,8 +113,8 @@ class LearningBasedProcessing:
         def write(epoch, loss_epoch):
             writer.add_scalar('loss/train', loss_epoch.item(), epoch)
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
-            print('Train Epoch: {:2d} \tLoss: {:.4f}'.format(
-                epoch, loss_epoch.item()))
+            if epoch % 100 == 0:
+                print('Train Epoch: {:2d} \tLoss: {:.4f}'.format(epoch, loss_epoch.item()))
             scheduler.step(epoch)
 
         def write_time(epoch, start_time):
@@ -290,9 +291,20 @@ class GyroLearningBasedProcessing(LearningBasedProcessing):
             self.plot_gyro_correction()
             plt.show()
 
+    def save_gyro_estimate(self, seq):
+        net_us = pload(self.address, seq, 'results.p')['hat_xs']
+        N = net_us.shape[0]
+        path = os.path.join("/home/leecw/Data/Result/DenoiseIMU/estimate/MH_02_easy/" + seq + '_net_us.csv')
+        header = "time(s),wx,wy,wz"
+        x = np.zeros(N, 4)
+        x[:, 0]
+
+
+
+
     def to_open_vins(self, dataset):
         """
-        Export results to Open-VINS format. Use them eval toolbox available 
+        Export results to Open-VINS format. Use them eval toolbox available
         at https://github.com/rpng/open_vins/
         """
 
@@ -303,14 +315,36 @@ class GyroLearningBasedProcessing(LearningBasedProcessing):
             raw_us, _ = dataset[i]
             net_us = pload(self.address, seq, 'results.p')['hat_xs']
             N = net_us.shape[0]
+
             net_qs, imu_Rots, net_Rots = self.integrate_with_quaternions_superfast(N, raw_us, net_us)
+
             path = os.path.join(self.address, seq + '.txt')
-            header = "timestamp(s) tx ty tz qx qy qz qw"
+            header = "time(s),tx,ty,tz,qx,qy,qz,qw"
             x = np.zeros((net_qs.shape[0], 8))
             x[:, 0] = self.gt['ts'][:net_qs.shape[0]]
             x[:, [7, 4, 5, 6]] = net_qs
-            np.savetxt(path, x[::10], header=header, delimiter=" ",
-                    fmt='%1.9f')
+            np.savetxt(path, x[::1], header=header, delimiter=",", fmt='%1.6f')
+
+            ### Save wx, wy, wz csv file
+            net_gyro_path = os.path.join("/root/Data/Result/DenoiseIMU/estimate/MH_02_easy/" + seq + '_net_us.csv')
+            header = "time(s),wx,wy,wz"
+            denoised = np.zeros((N, 4))
+            print("net_us.shape:", net_us.shape, "net_qs.shape:", net_qs.shape)
+            assert (net_us.shape[0] == net_qs.shape[0])
+            denoised[:, 0] = self.gt['ts'][:net_qs.shape[0]]
+            denoised[:, 1:4] = net_us
+            np.savetxt(net_gyro_path, denoised, header=header, delimiter=",", fmt='%1.6f')
+            ###
+
+            imu_rpys = SO3.to_rpy(imu_Rots).cpu()
+            net_rpys = SO3.to_rpy(net_Rots).cpu()
+            rpy_path = os.path.join(self.address, seq + '_rpy.txt')
+            header = "timestamp(s),roll,pitch,yaw"
+            y = np.zeros((net_rpys.shape[0], 4))
+            y[:, 0] = self.gt['ts'][:net_rpys.shape[0]]
+            y[:, [1, 2, 3]] = net_rpys
+            np.savetxt(rpy_path, y[::1], header=header, delimiter=",", fmt='%1.6f')
+
 
     def convert(self):
         # s -> min
@@ -350,8 +384,7 @@ class GyroLearningBasedProcessing(LearningBasedProcessing):
         raw_us = self.raw_us[:, :3]
         net_us = self.net_us[:, :3]
 
-        net_qs, imu_Rots, net_Rots = self.integrate_with_quaternions_superfast(N,
-        raw_us, net_us)
+        net_qs, imu_Rots, net_Rots = self.integrate_with_quaternions_superfast(N, raw_us, net_us)
         imu_rpys = 180/np.pi*SO3.to_rpy(imu_Rots).cpu()
         net_rpys = 180/np.pi*SO3.to_rpy(net_Rots).cpu()
         self.plot_orientation(imu_rpys, net_rpys, N)

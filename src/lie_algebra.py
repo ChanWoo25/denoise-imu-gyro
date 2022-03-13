@@ -27,12 +27,17 @@ class SO3:
 
     @classmethod
     def log(cls, Rot):
+        """
+            Convert SO(3) Rotation matrix to corresponding phi(wx,wy,wz) vector \n
+            Korean Ref: https://edward0im.github.io/mathematics/2020/05/01/lie-theory/#org608a5f4 \n
+            English implementation Ref:
+                https://vision.in.tum.de/_media/members/demmeln/nurlanov2021so3log.pdf / 2. SO(3) logarithm map
+        """
         dim_batch = Rot.shape[0]
         Id = cls.Id.expand(dim_batch, 3, 3)
 
         cos_angle = (0.5 * cls.btrace(Rot) - 0.5).clamp(-1., 1.)
-        # Clip cos(angle) to its proper domain to avoid NaNs from rounding
-        # errors
+        # Clip cos(angle) to its proper domain to avoid NaNs from rounding errors
         angle = cos_angle.acos()
         mask = angle < cls.TOL
         if mask.sum() == 0:
@@ -43,12 +48,12 @@ class SO3:
             return cls.vee(Rot - Id)
         phi = cls.vee(Rot - Id)
         angle = angle
-        phi[~mask] = cls.vee((0.5 * angle[~mask]/angle[~mask].sin()).unsqueeze(
-            1).unsqueeze(2)*(Rot[~mask] - Rot[~mask].transpose(1, 2)))
+        phi[~mask] = cls.vee((0.5 * angle[~mask]/angle[~mask].sin()).unsqueeze(1).unsqueeze(2)*(Rot[~mask] - Rot[~mask].transpose(1, 2)))
         return phi
 
     @staticmethod
     def vee(Phi):
+        """extract (w1,w2,w3)[N x R^3] from skew symmetric[N x R^3x3] form matrix"""
         return torch.stack((Phi[:, 2, 1],
                             Phi[:, 0, 2],
                             Phi[:, 1, 0]), dim=1)

@@ -7,11 +7,11 @@ import src.dataset as ds
 import numpy as np
 
 base_dir = os.path.dirname(os.path.realpath(__file__))
-data_dir = '/path/to/EUROC/dataset'
+data_dir = '/root/Data/EUROC'
 # test a given network
-# address = os.path.join(base_dir, 'results/EUROC/2020_02_18_16_52_55/')
+address = os.path.join(base_dir, 'results/EUROC/test_0306/')
 # or test the last trained network
-address = "last"
+# address = "last"
 ################################################################################
 # Network parameters
 ################################################################################
@@ -34,7 +34,7 @@ dataset_params = {
     # where are raw data ?
     'data_dir': data_dir,
     # where record preloaded data ?
-    'predata_dir': os.path.join(base_dir, 'data/EUROC'),
+    'predata_dir': os.path.join(base_dir, '/root/Data/EUROC'),
     # set train, val and test sequence
     'train_seqs': [
         'MH_01_easy',
@@ -98,7 +98,7 @@ train_params = {
     # frequency of validation step
     'freq_val': 600,
     # total number of epochs
-    'n_epochs': 1800,
+    'n_epochs': 3000,
     # where record results ?
     'res_dir': os.path.join(base_dir, "results/EUROC"),
     # where record Tensorboard log ?
