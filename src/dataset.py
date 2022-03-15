@@ -1,3 +1,5 @@
+import sys
+sys.path.append('/root/denoise')
 from src.utils import pdump, pload, bmtv, bmtm
 from src.lie_algebra import SO3
 from termcolor import cprint
@@ -20,9 +22,12 @@ class BaseDataset(Dataset):
         self.path_normalize_factors = os.path.join(predata_dir, 'nf.p')
 
         self.mode = mode
+        if mode is 'parse':
+            print("Parse mode -- parent class is not initiated.")
+            return
+
         # choose between training, validation or test sequences
-        train_seqs, self.sequences = self.get_sequences(train_seqs, val_seqs,
-            test_seqs)
+        train_seqs, self.sequences = self.get_sequences(train_seqs, val_seqs, test_seqs)
         # get and compute value for normalizing inputs
         self.mean_u, self.std_u = self.init_normalize_factors(train_seqs)
         self.mode = mode  # train, val or test
@@ -38,8 +43,7 @@ class BaseDataset(Dataset):
         self.N = N # power of 2
         self.min_train_freq = min_train_freq
         self.max_train_freq = max_train_freq
-        self.uni = torch.distributions.uniform.Uniform(-torch.ones(1),
-            torch.ones(1))
+        self.uni = torch.distributions.uniform.Uniform(-torch.ones(1), torch.ones(1))
 
     def get_sequences(self, train_seqs, val_seqs, test_seqs):
         """Choose sequence list depending on dataset mode"""
@@ -183,85 +187,115 @@ class EUROCDataset(BaseDataset):
     def __init__(self, data_dir, predata_dir, train_seqs, val_seqs,
                 test_seqs, mode, N, min_train_freq, max_train_freq, dt=0.005):
         super().__init__(predata_dir, train_seqs, val_seqs, test_seqs, mode, N, min_train_freq, max_train_freq, dt)
-        # convert raw data to pre loaded data
-        self.read_data(data_dir)
+        self.data_dir = data_dir
+        self.DEST_DIR = "/root/Data/Result/DenoiseIMU"
+        self.IN_DIR = predata_dir
+        self.OUT_DIR = os.path.join(self.DEST_DIR, "estimate")
+        self.GT_DIR = os.path.join(self.DEST_DIR, "gt")
 
-    def read_data(self, data_dir):
-        r"""Read the data from the dataset"""
+        if mode == 'parse':
+            self.sequences = ['MH_02_easy', 'MH_04_difficult']
+        self.gt_processed = {} # np.ndarray
+        self.imu_processed = {}
+        self.min_train_freq = min_train_freq
 
-        f = os.path.join(self.predata_dir, 'MH_01_easy.p')
-        if True and os.path.exists(f):
+        for sequence in self.sequences:
+            self.preprocess(sequence)
+            if self.mode == 'parse':
+                self.save_csv(sequence)
+
+    def save_csv(self, sequence):
+        print("Save pre-processed gt & imu csv files -- %s" % sequence)
+        gt_path = os.path.join(self.GT_DIR, sequence, "gt_interpolated.csv")
+        gt_csv = self.gt_processed[sequence][:,0:11]
+        header = "time[ns],px,py,pz,qw,qx,qy,qz,vx,vy,vz"
+        np.savetxt(gt_path, gt_csv, fmt="%d,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f", header=header)
+        print("\tsaved in file \'%s\'" % gt_path, "shape:", gt_csv.shape) # (29992, 11)
+
+        imu_path = os.path.join(self.DEST_DIR, sequence + "_raw_imu_interpolated.csv")
+        imu_csv = self.imu_processed[sequence]
+        header = "time[ns],wx,wy,wz,ax,ay,az"
+        np.savetxt(imu_path, imu_csv, fmt="%d,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f", header=header)
+        print("\tsaved in file \'%s\'" % imu_path, "shape:", imu_csv.shape) # (29992, 7)
+
+    def preprocess(self, sequence):
+        # if self.mode is not 'parse':
+        #     return
+
+        print("Preprocess -- %s" % sequence)
+        path_imu = os.path.join(self.data_dir, sequence, "mav0", "imu0", "data.csv")
+        path_gt = os.path.join(self.data_dir, sequence, "mav0", "state_groundtruth_estimate0", "data.csv")
+
+        predata_path = os.path.join(self.predata_dir, sequence + '.p')
+        predata_gt_path = os.path.join(self.predata_dir, sequence + '_gt.p')
+        if self.mode is not 'parse' and os.path.exists(predata_path) and os.path.exists(predata_gt_path):
+            print("\tPass")
             return
 
-        print("Start read_data, be patient please")
-        def set_path(seq):
-            path_imu = os.path.join(data_dir, seq, "mav0", "imu0", "data.csv")
-            path_gt = os.path.join(data_dir, seq, "mav0", "state_groundtruth_estimate0", "data.csv")
-            return path_imu, path_gt
+        imu = np.genfromtxt(path_imu, delimiter=",", skip_header=1)
+        gt = np.genfromtxt(path_gt, delimiter=",", skip_header=1)
 
-        sequences = os.listdir(data_dir)
-        # read each sequence
-        for sequence in sequences:
-            print("\nSequence name: " + sequence)
-            path_imu, path_gt = set_path(sequence)
-            imu = np.genfromtxt(path_imu, delimiter=",", skip_header=1)
-            gt = np.genfromtxt(path_gt, delimiter=",", skip_header=1)
+        # time synchronization between IMU and ground truth
+        t0 = np.max([gt[0, 0], imu[0, 0]])
+        t_end = np.min([gt[-1, 0], imu[-1, 0]])
 
-            # time synchronization between IMU and ground truth
-            t0 = np.max([gt[0, 0], imu[0, 0]])
-            t_end = np.min([gt[-1, 0], imu[-1, 0]])
+        # start index
+        idx0_imu = np.searchsorted(imu[:, 0], t0)
+        idx0_gt = np.searchsorted(gt[:, 0], t0)
 
-            # start index
-            idx0_imu = np.searchsorted(imu[:, 0], t0)
-            idx0_gt = np.searchsorted(gt[:, 0], t0)
+        # end index
+        idx_end_imu = np.searchsorted(imu[:, 0], t_end, 'right')
+        idx_end_gt = np.searchsorted(gt[:, 0], t_end, 'right')
 
-            # end index
-            idx_end_imu = np.searchsorted(imu[:, 0], t_end, 'right')
-            idx_end_gt = np.searchsorted(gt[:, 0], t_end, 'right')
+        # subsample
+        imu = imu[idx0_imu: idx_end_imu]
+        gt = gt[idx0_gt: idx_end_gt]
+        ts = imu[:, 0]/1e9
 
-            # subsample
-            imu = imu[idx0_imu: idx_end_imu]
-            gt = gt[idx0_gt: idx_end_gt]
-            ts = imu[:, 0]/1e9
+        # interpolate
+        gt = self.interpolate(gt, gt[:, 0]/1e9, ts)
+        self.gt_processed[sequence] = np.copy(gt)
+        self.imu_processed[sequence] = np.copy(imu)
 
-            # interpolate
-            gt = self.interpolate(gt, gt[:, 0]/1e9, ts)
+        # take ground truth position
+        p_gt = gt[:, 1:4]
+        p_gt = p_gt - p_gt[0]
 
-            # take ground truth position
-            p_gt = gt[:, 1:4]
-            p_gt = p_gt - p_gt[0]
+        # take ground true quaternion pose
+        q_gt = torch.Tensor(gt[:, 4:8]).double()
+        q_gt = q_gt / q_gt.norm(dim=1, keepdim=True)
+        Rot_gt = SO3.from_quaternion(q_gt.cuda(), ordering='wxyz').cpu()
 
-            # take ground true quaternion pose
-            q_gt = torch.Tensor(gt[:, 4:8]).double()
-            q_gt = q_gt / q_gt.norm(dim=1, keepdim=True)
-            Rot_gt = SO3.from_quaternion(q_gt.cuda(), ordering='wxyz').cpu()
+        # convert from numpy
+        p_gt = torch.Tensor(p_gt).double()
+        v_gt = torch.tensor(gt[:, 8:11]).double()
+        imu = torch.Tensor(imu[:, 1:]).double()
 
-            # convert from numpy
-            p_gt = torch.Tensor(p_gt).double()
-            v_gt = torch.tensor(gt[:, 8:11]).double()
-            imu = torch.Tensor(imu[:, 1:]).double()
+        # compute pre-integration factors for all training
+        mtf = self.min_train_freq
+        dRot_ij = bmtm(Rot_gt[:-mtf], Rot_gt[mtf:])
+        dRot_ij = SO3.dnormalize(dRot_ij.cuda())
+        dxi_ij = SO3.log(dRot_ij).cpu()
+        # print("\tdxi_ij -- ", dxi_ij.shape, dxi_ij.dtype) # [29976, 3]
 
-            # compute pre-integration factors for all training
-            mtf = self.min_train_freq
-            dRot_ij = bmtm(Rot_gt[:-mtf], Rot_gt[mtf:])
-            dRot_ij = SO3.dnormalize(dRot_ij.cuda())
-            dxi_ij = SO3.log(dRot_ij).cpu()
 
-            # save for all training
-            mondict = {
-                'xs': dxi_ij.float(),
-                'us': imu.float(),
-            }
-            pdump(mondict, self.predata_dir, sequence + ".p")
-            # save ground truth
-            mondict = {
-                'ts': ts,
-                'qs': q_gt.float(),
-                'vs': v_gt.float(),
-                'ps': p_gt.float(),
-            }
-            pdump(mondict, self.predata_dir, sequence + "_gt.p")
+        # save for all training
+        print("\tSaved in pickle file \'%s\'" % predata_path)
+        mondict = {
+            'xs': dxi_ij.float(),
+            'us': imu.float(),
+        }
+        pdump(mondict, self.predata_dir, sequence + ".p")
 
+        # save ground truth
+        print("\tSaved in pickle file \'%s\'" % predata_gt_path)
+        mondict = {
+            'ts': ts,
+            'qs': q_gt.float(),
+            'vs': v_gt.float(),
+            'ps': p_gt.float(),
+        }
+        pdump(mondict, self.predata_dir, sequence + "_gt.p")
 
 
 class TUMVIDataset(BaseDataset):
@@ -367,3 +401,40 @@ class TUMVIDataset(BaseDataset):
                 'ps': p_gt.float(),
             }
             pdump(mondict, self.predata_dir, sequence + "_gt.p")
+
+if __name__ == '__main__':
+    EUROC_DATASET_PARAMS = {
+        'predata_dir': '/root/Data/Result/DenoiseIMU',
+        # where are raw data ?
+        'data_dir': '/root/Data/EUROC',
+        # set train, val and test sequence
+        'train_seqs': [
+            'MH_01_easy',
+            'MH_03_medium',
+            'MH_05_difficult',
+            'V1_02_medium',
+            'V2_01_easy',
+            'V2_03_difficult'
+            ],
+        'val_seqs': [
+            'MH_01_easy',
+            'MH_03_medium',
+            'MH_05_difficult',
+            'V1_02_medium',
+            'V2_01_easy',
+            'V2_03_difficult',
+            ],
+        'test_seqs': [
+            'MH_02_easy',
+            'MH_04_difficult',
+            'V2_02_medium',
+            'V1_03_difficult',
+            'V1_01_easy',
+            ],
+        # size of trajectory during training
+        'N': 32 * 500, # should be integer * 'max_train_freq'
+        'min_train_freq': 16,
+        'max_train_freq': 32,
+    }
+
+    dataset_train = EUROCDataset(**EUROC_DATASET_PARAMS, mode='parse')

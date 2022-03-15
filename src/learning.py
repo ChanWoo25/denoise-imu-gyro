@@ -19,57 +19,52 @@ from src.utils import bmtm, bmtv, bmmt
 from datetime import datetime
 from src.lie_algebra import SO3, CPUSO3
 
+RESULT_DIR = "/root/Data/Result"
 
 class LearningBasedProcessing:
-    def __init__(self, res_dir, tb_dir, net_class, net_params, address, dt):
-        self.res_dir = res_dir
-        self.tb_dir = tb_dir
+    def __init__(self, params, net_class, net_params, address, dt):
+
+        self.params = params
         self.net_class = net_class
         self.net_params = net_params
+
         self._ready = False
-        self.train_params = {}
         self.figsize = (20, 12)
         self.dt = dt # (s)
-        self.address, self.tb_address = self.find_address(address)
-        if address is None:  # create new address
+
+        self.address = address
+        self.weight_path = os.path.join(self.address, 'weights.pt')
+
+        if self.params['is_train']:
             pdump(self.net_params, self.address, 'net_params.p')
             ydump(self.net_params, self.address, 'net_params.yaml')
-        else:  # pick the network parameters
-            self.net_params = pload(self.address, 'net_params.p')
-            self.train_params = pload(self.address, 'train_params.p')
-            self._ready = True
-        self.path_weights = os.path.join(self.address, 'weights.pt')
-        self.net = self.net_class(**self.net_params)
-        if self._ready:  # fill network parameters
-            self.load_weights()
-
-    def find_address(self, address):
-        """return path where net and training info are saved"""
-        if address == 'last':
-            addresses = sorted(os.listdir(self.res_dir))
-            tb_address = os.path.join(self.tb_dir, str(len(addresses)))
-            address = os.path.join(self.res_dir, addresses[-1])
-        elif address is None:
-            now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-            address = os.path.join(self.res_dir, now)
-            mkdir(address)
-            tb_address = os.path.join(self.tb_dir, now)
+            self.net = self.net_class(**self.net_params)
         else:
-            tb_address = None
-        return address, tb_address
+            self.net_params = pload(self.address, 'net_params.p')
+            self.params = pload(self.address, 'train_params.p')
+            self.net = self.net_class(**self.net_params)
+            weights = torch.load(self.weight_path)
+            self.net.load_state_dict(weights)
 
-    def load_weights(self):
-        weights = torch.load(self.path_weights)
-        self.net.load_state_dict(weights)
         self.net.cuda()
 
-    def train(self, dataset_class, dataset_params, train_params):
-        """train the neural network. GPU is assumed"""
-        self.train_params = train_params
-        pdump(self.train_params, self.address, 'train_params.p')
-        ydump(self.train_params, self.address, 'train_params.yaml')
+    # def find_address(self, address):
+    #     """return path where net and training info are saved"""
+    #     if address == 'last':
+    #         addresses = sorted(os.listdir(self.res_dir))
+    #         address = os.path.join(self.res_dir, addresses[-1])
+    #     elif address is None:
+    #         now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    #         address = os.path.join(self.res_dir, now)
+    #         mkdir(address)
+    #     return address
 
-        hparams = self.get_hparams(dataset_class, dataset_params, train_params)
+    def train(self, dataset_class, dataset_params):
+        """train the neural network. GPU is assumed"""
+        pdump(self.params, self.address, 'train_params.p')
+        ydump(self.params, self.address, 'train_params.yaml')
+
+        hparams = self.get_hparams(dataset_class, dataset_params)
         ydump(hparams, self.address, 'hparams.yaml')
 
         # define datasets
@@ -79,15 +74,15 @@ class LearningBasedProcessing:
         dataset_val.init_val()
 
         # get class
-        Optimizer = train_params['optimizer_class']
-        Scheduler = train_params['scheduler_class']
-        Loss = train_params['loss_class']
+        Optimizer = self.params['optimizer_class']
+        Scheduler = self.params['scheduler_class']
+        Loss = self.params['loss_class']
 
         # get parameters
-        dataloader_params = train_params['dataloader']
-        optimizer_params = train_params['optimizer']
-        scheduler_params = train_params['scheduler']
-        loss_params = train_params['loss']
+        dataloader_params = self.params['dataloader']
+        optimizer_params = self.params['optimizer']
+        scheduler_params = self.params['scheduler']
+        loss_params = self.params['loss']
 
         # define optimizer, scheduler and loss
         dataloader = DataLoader(dataset_train, **dataloader_params)
@@ -96,8 +91,8 @@ class LearningBasedProcessing:
         criterion = Loss(**loss_params)
 
         # remaining training parameters
-        freq_val = train_params['freq_val']
-        n_epochs = train_params['n_epochs']
+        freq_val = self.params['freq_val']
+        n_epochs = self.params['n_epochs']
 
         # init net w.r.t dataset
         self.net = self.net.cuda()
@@ -105,7 +100,7 @@ class LearningBasedProcessing:
         self.net.set_normalized_factors(mean_u, std_u)
 
         # start tensorboard writer
-        writer = SummaryWriter(self.tb_address)
+        writer = SummaryWriter(self.address)
         start_time = time.time()
         best_loss = torch.Tensor([float('Inf')])
 
@@ -113,7 +108,7 @@ class LearningBasedProcessing:
         def write(epoch, loss_epoch):
             writer.add_scalar('loss/train', loss_epoch.item(), epoch)
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
-            if epoch % 100 == 0:
+            if epoch % 200 == 0:
                 print('Train Epoch: {:2d} \tLoss: {:.4f}'.format(epoch, loss_epoch.item()))
             scheduler.step(epoch)
 
@@ -153,7 +148,11 @@ class LearningBasedProcessing:
 
         # test on new data
         dataset_test = dataset_class(**dataset_params, mode='test')
-        self.load_weights()
+
+        weights = torch.load(self.weight_path)
+        self.net.load_state_dict(weights)
+        self.net.cuda()
+
         test_loss = self.loop_val(dataset_test, criterion)
         dict_loss = {
             'final_loss/val': best_loss.item(),
@@ -192,24 +191,24 @@ class LearningBasedProcessing:
     def save_net(self):
         """save the weights on the net in CPU"""
         self.net.eval().cpu()
-        torch.save(self.net.state_dict(), self.path_weights)
+        torch.save(self.net.state_dict(), self.weight_path)
         self.net.train().cuda()
 
-    def get_hparams(self, dataset_class, dataset_params, train_params):
+    def get_hparams(self, dataset_class, dataset_params):
         """return all training hyperparameters in a dict"""
-        Optimizer = train_params['optimizer_class']
-        Scheduler = train_params['scheduler_class']
-        Loss = train_params['loss_class']
+        Optimizer = self.params['optimizer_class']
+        Scheduler = self.params['scheduler_class']
+        Loss = self.params['loss_class']
 
         # get training class parameters
-        dataloader_params = train_params['dataloader']
-        optimizer_params = train_params['optimizer']
-        scheduler_params = train_params['scheduler']
-        loss_params = train_params['loss']
+        dataloader_params = self.params['dataloader']
+        optimizer_params = self.params['optimizer']
+        scheduler_params = self.params['scheduler']
+        loss_params = self.params['loss']
 
         # remaining training parameters
-        freq_val = train_params['freq_val']
-        n_epochs = train_params['n_epochs']
+        freq_val = self.params['freq_val']
+        n_epochs = self.params['n_epochs']
 
         dict_class = {
             'Optimizer': str(Optimizer),
@@ -221,28 +220,40 @@ class LearningBasedProcessing:
                 **loss_params, **scheduler_params,
                 'n_epochs': n_epochs, 'freq_val': freq_val}
 
-    def test(self, dataset_class, dataset_params, modes):
+    def test(self, dataset_class, dataset_params):
         """test a network once training is over"""
 
         # get loss function
-        Loss = self.train_params['loss_class']
-        loss_params = self.train_params['loss']
+        Loss = self.params['loss_class']
+        loss_params = self.params['loss']
         criterion = Loss(**loss_params)
 
-        # test on each type of sequence
-        for mode in modes:
-            dataset = dataset_class(**dataset_params, mode=mode)
-            self.loop_test(dataset, criterion)
-            self.display_test(dataset, mode)
+        self.dataset = dataset_class(mode='test',**dataset_params)
+        self.loop_test(criterion)
+        self.display_test()
 
-    def loop_test(self, dataset, criterion):
+    def loop_test(self, criterion):
         """Forward loop over test data"""
         self.net.eval()
-        for i in range(len(dataset)):
-            seq = dataset.sequences[i]
-            us, xs = dataset[i]
+        for i in range(len(self.dataset)):
+            seq = self.dataset.sequences[i]
+            us, xs = self.dataset[i]
             with torch.no_grad():
                 hat_xs = self.net(us.cuda().unsqueeze(0))
+
+
+            ### DEBUG
+            # print("hat_xs:", hat_xs.shape) # [1, 29952, 3]
+            # if seq in ['MH_02_easy', 'MH_04_difficult']:
+            #     print("Test -- MH_02_easy")
+            #     print("\tus:", us.shape)
+            #     print("\txs:", xs.shape)
+            #     print("\that_xs:", hat_xs.shape)
+            #     gt_processed_path = os.path.join("/root/Data/Result/DenoiseIMU/gt", seq, "gt_processed.csv")
+            #     gt_processed = np.loadtxt(gt_processed_path, delimiter=',')
+            #     print("\tgt_processed from {} -- shape({})".format(seq, gt_processed.shape))
+            ###
+
             loss = criterion(xs.cuda().unsqueeze(0), hat_xs)
             mkdir(self.address, seq)
             mondict = {
@@ -251,37 +262,38 @@ class LearningBasedProcessing:
             }
             pdump(mondict, self.address, seq, 'results.p')
 
-    def display_test(self, dataset, mode):
+    def display_test(self):
         raise NotImplementedError
 
 
 class GyroLearningBasedProcessing(LearningBasedProcessing):
-    def __init__(self, res_dir, tb_dir, net_class, net_params, address, dt):
-        super().__init__(res_dir, tb_dir, net_class, net_params, address, dt)
+    def __init__(self, params, net_class, net_params, address, dt):
+        super().__init__(params, net_class, net_params, address, dt)
         self.roe_dist = [7, 14, 21, 28, 35] # m
         self.freq = 100 # subsampling frequency for RTE computation
-        self.roes = { # relative trajectory errors
-            'Rots': [],
-            'yaws': [],
-            }
 
-    def display_test(self, dataset, mode):
-        self.roes = {
-            'Rots': [],
-            'yaws': [],
-        }
-        self.to_open_vins(dataset)
-        for i, seq in enumerate(dataset.sequences):
-            print('\n', 'Results for sequence ' + seq )
+    def display_test(self):
+
+        self.to_open_vins()
+        for i, seq in enumerate(self.dataset.sequences):
+            # print('\n', 'Results for sequence ' + seq )
             self.seq = seq
             # get ground truth
-            self.gt = dataset.load_gt(i)
+            self.gt = self.dataset.load_gt(i)
             Rots = SO3.from_quaternion(self.gt['qs'].cuda())
             self.gt['Rots'] = Rots.cpu()
             self.gt['rpys'] = SO3.to_rpy(Rots).cpu()
             # get data and estimate
             self.net_us = pload(self.address, seq, 'results.p')['hat_xs']
-            self.raw_us, _ = dataset[i]
+            self.raw_us, _ = self.dataset[i]
+
+            ###
+            # print("\tself.net_us:", self.net_us.shape)
+            # print("\t\t", self.net_us[:5])
+            # print("\tself.raw_us:", self.raw_us.shape)
+            # print("\t\t", self.raw_us[:5])
+            ###
+
             N = self.net_us.shape[0]
             self.gyro_corrections =  (self.raw_us[:, :3] - self.net_us[:N, :3])
             self.ts = torch.linspace(0, N*self.dt, N)
@@ -289,61 +301,103 @@ class GyroLearningBasedProcessing(LearningBasedProcessing):
             self.convert()
             self.plot_gyro()
             self.plot_gyro_correction()
-            plt.show()
+            # plt.show()
 
     def save_gyro_estimate(self, seq):
         net_us = pload(self.address, seq, 'results.p')['hat_xs']
         N = net_us.shape[0]
-        path = os.path.join("/home/leecw/Data/Result/DenoiseIMU/estimate/MH_02_easy/" + seq + '_net_us.csv')
+        path = os.path.join("/home/leecw/Data/Result/DenoiseIMU/estimate", seq, seq + '_net_us.csv')
         header = "time(s),wx,wy,wz"
         x = np.zeros(N, 4)
         x[:, 0]
 
 
-
-
-    def to_open_vins(self, dataset):
+    def to_open_vins(self):
         """
         Export results to Open-VINS format. Use them eval toolbox available
         at https://github.com/rpng/open_vins/
         """
+        print("open_vins()")
 
-        for i, seq in enumerate(dataset.sequences):
+        for i, seq in enumerate(self.dataset.sequences):
             self.seq = seq
             # get ground truth
-            self.gt = dataset.load_gt(i)
-            raw_us, _ = dataset[i]
+            self.gt = self.dataset.load_gt(i)
+            raw_us, _ = self.dataset[i]
             net_us = pload(self.address, seq, 'results.p')['hat_xs']
             N = net_us.shape[0]
 
             net_qs, imu_Rots, net_Rots = self.integrate_with_quaternions_superfast(N, raw_us, net_us)
 
-            path = os.path.join(self.address, seq + '.txt')
+            path = os.path.join(self.address, seq + '.csv')
             header = "time(s),tx,ty,tz,qx,qy,qz,qw"
             x = np.zeros((net_qs.shape[0], 8))
             x[:, 0] = self.gt['ts'][:net_qs.shape[0]]
+
             x[:, [7, 4, 5, 6]] = net_qs
-            np.savetxt(path, x[::1], header=header, delimiter=",", fmt='%1.6f')
+            np.savetxt(path, x[::1], header=header, delimiter=",", fmt='%1.9f')
 
             ### Save wx, wy, wz csv file
-            net_gyro_path = os.path.join("/root/Data/Result/DenoiseIMU/estimate/MH_02_easy/" + seq + '_net_us.csv')
-            header = "time(s),wx,wy,wz"
-            denoised = np.zeros((N, 4))
-            print("net_us.shape:", net_us.shape, "net_qs.shape:", net_qs.shape)
-            assert (net_us.shape[0] == net_qs.shape[0])
-            denoised[:, 0] = self.gt['ts'][:net_qs.shape[0]]
-            denoised[:, 1:4] = net_us
-            np.savetxt(net_gyro_path, denoised, header=header, delimiter=",", fmt='%1.6f')
+            # if seq in ['MH_02_easy', 'MH_04_difficult']:
+            #     print("\t", seq)
+            #     N = net_qs.shape[0]
+            #     print("\t\tnet_qs: ", net_qs.shape)
+            #     print("\t\tnet_us: ", net_us.shape)
+            #     print("\t\timu_Rots: ", imu_Rots.shape)
+            #     print("\t\tnet_Rots: ", net_Rots.shape)
+            #     print("\t\tself.gt['ts']:", self.gt['ts'].shape)
+
+            #     gt_processed_path = os.path.join("/root/Data/Result/DenoiseIMU/gt", seq, "gt_processed.csv")
+            #     gt_processed = np.loadtxt(gt_processed_path, delimiter=',')
+            #     t_ns = gt_processed[:, 0]
+            #     print("\t\tt_ns:", t_ns.shape)      # (29992,) float64
+            #     print("\t\traw_us:", raw_us.shape)  # [29952, 6]
+
+            #     imu_processed_path = os.path.join("/root/Data/Result/DenoiseIMU/estimate", seq, "imu_processed.csv")
+            #     imu_processed = np.loadtxt(imu_processed_path, delimiter=',')
+
+
+            #     denoised_path = os.path.join("/root/Data/Result/DenoiseIMU/estimate", seq, "denoised.csv")
+            #     header = "timestamp [ns],w_RS_S_x [rad s^-1],w_RS_S_y [rad s^-1],w_RS_S_z [rad s^-1],a_RS_S_x [m s^-2],a_RS_S_y [m s^-2],a_RS_S_z [m s^-2]"
+            #     denoised = np.zeros((N, 7))
+            #     denoised[:, 0] = imu_processed[:N, 0]
+            #     denoised[:, 1:4] = net_us
+            #     denoised[:, 4:7] = imu_processed[:N, 4:7]
+            #     np.savetxt(denoised_path, denoised, header=header, fmt='%d,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f')
+            #     print("\t\tdenoised is saved in \'%s\'" % denoised_path)
             ###
 
+            ### DENOISED IMU DATA
+            if seq in ['MH_02_easy', 'MH_04_difficult']:
+                raw_interpolated_imu_path = os.path.join("/root/Data/Result/DenoiseIMU", seq + '_raw_imu_interpolated.csv')
+                raw_interpolated_imu = np.loadtxt(raw_interpolated_imu_path, dtype=np.float64, delimiter=',')
+                denoised_interpolated_imu = raw_interpolated_imu[:net_us.shape[0]]
+                denoised_interpolated_imu_path = os.path.join(self.address, seq, 'denoised_imu.csv')
+                denoised_interpolated_imu[:,1:4] = np.squeeze(net_us)
+                header = "time[ns],wx,wy,wz,ax,ay,az"
+                np.savetxt(denoised_interpolated_imu_path, denoised_interpolated_imu, fmt="%d,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f", header=header)
+                print("denoied imu data is saved in \'%s\'" % denoised_interpolated_imu_path)
+
+
+            # Save net_us on csv file
+            # net_us_csv = np.zeros((net_us))
+            # np.savetxt("/root/Data/Result/DenoiseIMU/estimate/MH_02_easy/net_us.csv", )
+
+            imu_rpys_path = os.path.join(self.address, seq, 'raw_rpy.csv')
+            net_rpys_path = os.path.join(self.address, seq, 'net_rpy.csv')
             imu_rpys = SO3.to_rpy(imu_Rots).cpu()
             net_rpys = SO3.to_rpy(net_Rots).cpu()
-            rpy_path = os.path.join(self.address, seq + '_rpy.txt')
+            imu_t = self.gt['ts'][:imu_rpys.shape[0]]
+            imu_t = np.expand_dims(imu_t, axis=1)
+            net_t = self.gt['ts'][:net_rpys.shape[0]]
+            net_t = np.expand_dims(net_t, axis=1)
+            imu_rpys = np.hstack((imu_t, imu_rpys))
+            net_rpys = np.hstack((net_t, net_rpys))
             header = "timestamp(s),roll,pitch,yaw"
-            y = np.zeros((net_rpys.shape[0], 4))
-            y[:, 0] = self.gt['ts'][:net_rpys.shape[0]]
-            y[:, [1, 2, 3]] = net_rpys
-            np.savetxt(rpy_path, y[::1], header=header, delimiter=",", fmt='%1.6f')
+            np.savetxt(imu_rpys_path, imu_rpys, header=header, delimiter=",", fmt='%1.9f')
+            np.savetxt(net_rpys_path, net_rpys, header=header, delimiter=",", fmt='%1.9f')
+            print("raw imu rpy is saved in \'%s\'" % imu_rpys_path)
+            print("net imu rpy is saved in \'%s\'" % net_rpys_path)
 
 
     def convert(self):
@@ -399,10 +453,16 @@ class GyroLearningBasedProcessing(LearningBasedProcessing):
         axs[2].set(xlabel='$t$ (min)', ylabel='yaw (deg)')
 
         for i in range(3):
-            axs[i].plot(self.ts, gt[:, i], color='black', label=r'ground truth')
-            axs[i].plot(self.ts, imu_rpys[:, i], color='red', label=r'raw IMU')
-            axs[i].plot(self.ts, net_rpys[:, i], color='blue', label=r'net IMU')
+            axs[i].plot(self.ts, gt[:, i]%360, color='black', label=r'ground truth')
+            axs[i].plot(self.ts, imu_rpys[:, i]%360, color='red', label=r'raw IMU')
+            axs[i].plot(self.ts, net_rpys[:, i]%360, color='blue', label=r'net IMU')
             axs[i].set_xlim(self.ts[0], self.ts[-1])
+            ### Save csv file
+            # header = 'time,roll,pitch,yaw'
+            # np.savetxt(os.path.join(self.address, self.dataset.sequences[i] + '_gt_rpys.csv'), np.stack((self.tx, gt[:,i]), axis=1), fmt='%1.9f', delimiter=',', header=header)
+            # np.savetxt(os.path.join(self.address, self.dataset.sequences[i] + '_imu_rpys.csv'), np.stack((self.tx, imu_rpys[:,i]), axis=1), fmt='%1.9f', delimiter=',', header=header)
+            # np.savetxt(os.path.join(self.address, self.dataset.sequences[i] + '_net_rpys.csv'), np.stack((self.tx, net_rpys[:,i]), axis=1), fmt='%1.9f', delimiter=',', header=header)
+            ###
         self.savefig(axs, fig, 'orientation')
 
     def plot_orientation_error(self, imu_Rots, net_Rots, N):
@@ -420,6 +480,11 @@ class GyroLearningBasedProcessing(LearningBasedProcessing):
             axs[i].plot(self.ts, net_err[:, i], color='blue', label=r'net IMU')
             axs[i].set_ylim(-10, 10)
             axs[i].set_xlim(self.ts[0], self.ts[-1])
+            ### Save csv file
+            # header = 'time,roll,pitch,yaw'
+            # np.savetxt(os.path.join(self.address, self.dataset.sequences[i] + '_raw_err.csv'), np.stack((self.ts, raw_err[:,i]), axis=1), fmt='%1.9f', delimiter=',', header=header)
+            # np.savetxt(os.path.join(self.address, self.dataset.sequences[i] + '_net_err.csv'), np.stack((self.ts, net_err[:,i]), axis=1), fmt='%1.9f', delimiter=',', header=header)
+            ###
         self.savefig(axs, fig, 'orientation_error')
 
     def plot_gyro_correction(self):

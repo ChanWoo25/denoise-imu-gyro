@@ -93,7 +93,7 @@ def read_(sequence:str):
     gt_dRot[:, 1] = time_ns[mtf:]
     gt_dRot[:, 2:11] = dRot_ij.reshape(N, 9)
     np.savetxt(path_dRot, gt_dRot, header=header,
-               fmt="%d,%d,%1.6f,%1.6f,%1.6f,%1.6f,%1.6f,%1.6f,%1.6f,%1.6f,%1.6f")
+               fmt="%d,%d,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f,%1.9f")
 
     ### DEBUG
     # pre = dRot_ij[0:2]
