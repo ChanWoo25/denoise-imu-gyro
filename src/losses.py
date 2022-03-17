@@ -41,8 +41,7 @@ class GyroLoss(BaseLoss):
 
     def f_huber(self, rs):
         """Huber loss function"""
-        loss = self.w*self.sl(rs/self.huber,
-            torch.zeros_like(rs))*(self.huber**2)
+        loss = self.w * self.sl(rs/self.huber, torch.zeros_like(rs)) * (self.huber**2)
         return loss
 
     def forward_with_rotation_matrices(self, xs, hat_xs):
