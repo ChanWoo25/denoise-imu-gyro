@@ -1,3 +1,9 @@
+import sys
+if sys.platform.startswith('win'):
+    sys.path.append(r"C:\Users\leech\Desktop\imu_ws\denoise-imu-gyro") # My window workspace path
+elif sys.platform.startswith('linux'):
+    sys.path.append('/root/denoise')
+
 from src.utils import *
 import numpy as np
 

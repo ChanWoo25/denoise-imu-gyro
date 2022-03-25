@@ -1,5 +1,9 @@
 import sys
-sys.path.append('/root/denoise')
+if sys.platform.startswith('win'):
+    sys.path.append(r"C:\Users\leech\Desktop\imu_ws\denoise-imu-gyro") # My window workspace path
+elif sys.platform.startswith('linux'):
+    sys.path.append('/root/denoise')
+
 from src.utils import pdump, pload, bmtv, bmtm
 from src.lie_algebra import SO3
 from termcolor import cprint
