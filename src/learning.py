@@ -19,7 +19,7 @@ from src.utils import bmtm, bmtv, bmmt
 from datetime import datetime
 from src.lie_algebra import SO3, CPUSO3
 
-RESULT_DIR = "/root/Data/Result"
+# RESULT_DIR = "/root/Data/Result"
 
 class LearningBasedProcessing:
     def __init__(self, params, net_class, net_params, address, dt):
@@ -426,6 +426,10 @@ class GyroLearningBasedProcessing(LearningBasedProcessing):
         if int(N) < N:
             k = 2**int(N)
             k2 = imu_qs[k:].shape[0]
+            print("[integrate_with_quaternions_superfast()]")
+            print("imu_qs: ", imu_qs.shape)
+            print("k: %d, k2: %d"%(k, k2))
+            print("qmul with %d x %d" % (imu_qs[:k2].shape[0], imu_qs[k:].shape[0]))
             imu_qs[k:] = SO3.qnorm(SO3.qmul(imu_qs[:k2], imu_qs[k:]))
             net_qs[k:] = SO3.qnorm(SO3.qmul(net_qs[:k2], net_qs[k:]))
 

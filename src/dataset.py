@@ -192,7 +192,7 @@ class EUROCDataset(BaseDataset):
                 test_seqs, mode, N, min_train_freq, max_train_freq, dt=0.005):
         super().__init__(predata_dir, train_seqs, val_seqs, test_seqs, mode, N, min_train_freq, max_train_freq, dt)
         self.data_dir = data_dir
-        self.DEST_DIR = "/root/Data/Result/DenoiseIMU"
+        self.DEST_DIR = predata_dir
         self.IN_DIR = predata_dir
         self.OUT_DIR = os.path.join(self.DEST_DIR, "estimate")
         self.GT_DIR = os.path.join(self.DEST_DIR, "gt")

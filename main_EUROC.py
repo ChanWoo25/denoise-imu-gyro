@@ -15,8 +15,15 @@ parser.add_argument('--id', type=str, default=None)
 args = parser.parse_args()
 print(args.__dict__)
 
-data_dir = "/root/Data/EUROC"
-result_dir = "/root/Data/Result/DenoiseIMU"
+import sys
+data_dir = "data"
+result_dir = "result"
+if sys.platform.startswith('win'):
+    data_dir = "data"
+    result_dir = "result"
+elif sys.platform.startswith('linux'):
+    data_dir = "/root/Data/EUROC"
+    result_dir = "/root/Data/Result/DenoiseIMU"
 id = args.id
 # load_id = "220315"
 
