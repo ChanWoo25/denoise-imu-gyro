@@ -16,10 +16,14 @@ def vis(xs:torch.Tensor):
         print(x, x.shape)
         print()
 
-class GyroNet(torch.nn.Module):
-    def __init__(self, in_dim, out_dim, c0, dropout, ks, ds, momentum, gyro_std):
+
+class DGANet(torch.nn.Module):
+    def __init__(self, in_dim, out_dim, c0, dropout, ks, ds, momentum, gyro_std, acc_std):
         super().__init__()
-        print("Initialize Start")
+        print('GADNet is initialized.')
+        print('\tGADNet is a deep neural network for denoising IMU sensor\'s raw measurements')
+        print('\t- Denoise\n\t- Gyroscope\n\t- Accelerometer\n\t- Net')
+
         self.in_dim = in_dim
         self.out_dim = out_dim
         # channel dimension
@@ -56,26 +60,36 @@ class GyroNet(torch.nn.Module):
         self.replicationPad1dS = torch.nn.ReplicationPad1d((p0, 0))
         self.replicationPad1dE = torch.nn.ReplicationPad1d((0, 0))
 
+        ### Parameter member variables
+        # Trainable
+        self.C_w = torch.nn.Parameter(torch.randn(3, 3)*5e-2)
+        self.C_a = torch.nn.Parameter(torch.randn(3, 3)*5e-2)
+        # Not trainable
+        self.mean_u     = torch.nn.Parameter(torch.zeros(in_dim),   requires_grad=False)
+        self.std_u      = torch.nn.Parameter(torch.ones(in_dim),    requires_grad=False)
+        self.gyro_std   = torch.nn.Parameter(torch.Tensor(gyro_std),requires_grad=False)
+        self.acc_std    = torch.nn.Parameter(torch.Tensor(acc_std), requires_grad=False)
+        ###
 
-        # for normalizing inputs
-        self.mean_u = torch.nn.Parameter(torch.zeros(in_dim), requires_grad=False)
-        self.std_u  = torch.nn.Parameter(torch.ones(in_dim),  requires_grad=False)
+        ### Non-parameter member variables
+        self.gt_rots = None
+        print("gt_rots' grad:", self.gt_rots)
+        ###
 
-        gyro_std = torch.Tensor(gyro_std)
-        self.gyro_std = torch.nn.Parameter(gyro_std, requires_grad=False)
-
-        gyro_Rot = 0.05*torch.randn(3, 3)
-        self.gyro_Rot = torch.nn.Parameter(gyro_Rot)
-        # self.Id3 = torch.eye(3)
-        self.Id3 = torch.nn.Parameter(torch.eye(3), requires_grad=False)
         print("Initialize End")
 
     def set_normalized_factors(self, mean_u, std_u):
         self.mean_u = torch.nn.Parameter(mean_u.cuda(), requires_grad=False)
         self.std_u = torch.nn.Parameter(std_u.cuda(), requires_grad=False)
 
+    def grab_gt_rots(self, gt_rots:torch.Tensor):
+        self.gt_rots = gt_rots
+        print("gt_rots' grad:", self.gt_rots.requires_grad)
+
     def forward(self, x:torch.Tensor):
         us = torch.clone(x)
+        w_imu = us[:, :, 0:3]
+        a_imu = us[:, :, 3:6]
 
         # Normalize
         x = (x - self.mean_u) / self.std_u
@@ -106,17 +120,23 @@ class GyroNet(torch.nn.Module):
 
         x = self.conv5(x)
         x = x.transpose(1, 2)
+        w_tilde = x[:, :, 0:3]
+        a_tilde = x[:, :, 3:6]
 
-        # Post-process
-        Rots = (self.Id3 + self.gyro_Rot).expand(us.shape[0], us.shape[1], 3, 3)
-        Rot_us = bbmv(Rots, us[:, :, :3])
-        w_hat = self.gyro_std * x + Rot_us
-        print("Rot_us:", Rot_us.shape, Rot_us.dtype)
-        print("x:", x.shape, x.dtype)
-        print("w_hat:", w_hat.shape, w_hat.dtype)
+        # w -- Post-process
+        C_w = (torch.eye(3) + self.C_w).expand(us.shape[0], us.shape[1], 3, 3)
+        Rot_us = bbmv(C_w, w_imu)
+        w_hat = self.gyro_std * w_tilde + Rot_us
         # Rot_us: torch.Size([6, 16000, 3]) torch.float32
-        # x: torch.Size([6, 16000, 3]) torch.float32
+        # w_tilde: torch.Size([6, 16000, 3]) torch.float32
         # w_hat: torch.Size([6, 16000, 3]) torch.float32
+
+        # a -- Post-process
+        C_a = (torch.eye(3) + self.C_a).expand(us.shape[0], us.shape[1], 3, 3)
+        a_hat = bbmv(C_a, a_imu) + self.acc_std * a_tilde
+
+
+
         return w_hat
 
 net_params = {
@@ -132,7 +152,7 @@ net_params = {
 
 if __name__ == "__main__":
 
-    net = GyroNet(**net_params).cuda()
+    net = DGANet(**net_params).cuda()
     print(net)
     vis([net.mean_u, net.std_u, net.gyro_Rot, net.gyro_std, net.Id3])
 

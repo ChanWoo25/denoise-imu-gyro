@@ -1,11 +1,13 @@
+# Ver 1 :: 구현 초기 | GT 로테이션을 가지고 Accel을 원래 좌표계로 돌려서 denoise 학습이 잘 되는지 확인
+
 import os
-from unittest import result
 import torch
 import src.learning as lr
 import src.networks as sn
 import src.losses as sl
 import src.dataset as ds
 import numpy as np
+from src.DGANet import DGANet
 
 
 import argparse
@@ -15,15 +17,8 @@ parser.add_argument('--id', type=str, default=None)
 args = parser.parse_args()
 print(args.__dict__)
 
-import sys
-data_dir = "data"
-result_dir = "result"
-if sys.platform.startswith('win'):
-    data_dir = "data"
-    result_dir = "result"
-elif sys.platform.startswith('linux'):
-    data_dir = "/root/Data/EUROC"
-    result_dir = "/root/Data/Result/DenoiseIMU"
+data_dir = "/root/denoise/data"
+result_dir = "/root/denoise/results"
 id = args.id
 # load_id = "220315"
 
@@ -41,6 +36,18 @@ net_class = sn.GyroNet
 net_params = {
     'in_dim': 6,
     'out_dim': 3,
+    'c0': 16,
+    'dropout': 0.1,
+    'ks': [7, 7, 7, 7],
+    'ds': [4, 4, 4],
+    'momentum': 0.1,
+    'gyro_std': [1*np.pi/180, 2*np.pi/180, 5*np.pi/180],
+}
+
+dga_class = DGANet
+dga_params = {
+    'in_dim': 6,
+    'out_dim': 6,
     'c0': 16,
     'dropout': 0.1,
     'ks': [7, 7, 7, 7],
