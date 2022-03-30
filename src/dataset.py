@@ -282,12 +282,17 @@ class EUROCDataset(BaseDataset):
         dxi_ij = SO3.log(dRot_ij).cpu()
         # print("\tdxi_ij -- ", dxi_ij.shape, dxi_ij.dtype) # [29976, 3]
 
+        delta_v_gt = v_gt[:-mtf] - v_gt[mtf:]
 
         # save for all training
         print("\tSaved in pickle file \'%s\'" % predata_path)
+        print("\txs:", dxi_ij.shape, dxi_ij.dtype)
+        print("\tus:", imu.shape, imu.dtype)
+        print("\tdv_gt:", delta_v_gt.shape, delta_v_gt.dtype)
         mondict = {
             'xs': dxi_ij.float(),
             'us': imu.float(),
+            'dv_gt': delta_v_gt.float(),
         }
         pdump(mondict, self.predata_dir, sequence + ".p")
 

@@ -111,9 +111,10 @@ class GyroNet(torch.nn.Module):
         Rots = (self.Id3 + self.gyro_Rot).expand(us.shape[0], us.shape[1], 3, 3)
         Rot_us = bbmv(Rots, us[:, :, :3])
         w_hat = self.gyro_std * x + Rot_us
-        print("Rot_us:", Rot_us.shape, Rot_us.dtype)
-        print("x:", x.shape, x.dtype)
-        print("w_hat:", w_hat.shape, w_hat.dtype)
+
+        # print("Rot_us:", Rot_us.shape, Rot_us.dtype)
+        # print("x:", x.shape, x.dtype)
+        # print("w_hat:", w_hat.shape, w_hat.dtype)
         # Rot_us: torch.Size([6, 16000, 3]) torch.float32
         # x: torch.Size([6, 16000, 3]) torch.float32
         # w_hat: torch.Size([6, 16000, 3]) torch.float32

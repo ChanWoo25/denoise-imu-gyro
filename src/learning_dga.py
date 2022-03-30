@@ -19,11 +19,8 @@ from src.utils import bmtm, bmtv, bmmt
 from datetime import datetime
 from src.lie_algebra import SO3, CPUSO3
 
-# RESULT_DIR = "/root/Data/Result"
-
-class LearningBasedProcessing:
+class LearningProcess:
     def __init__(self, params, net_class, net_params, address, dt):
-
         self.params = params
         self.net_class = net_class
         self.net_params = net_params
@@ -48,20 +45,8 @@ class LearningBasedProcessing:
 
         self.net.cuda()
 
-    # def find_address(self, address):
-    #     """return path where net and training info are saved"""
-    #     if address == 'last':
-    #         addresses = sorted(os.listdir(self.res_dir))
-    #         address = os.path.join(self.res_dir, addresses[-1])
-    #     elif address is None:
-    #         now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    #         address = os.path.join(self.res_dir, now)
-    #         mkdir(address)
-    #     return address
-
     def train(self, dataset_class, dataset_params):
         """train the neural network. GPU is assumed"""
-        pdump(self.params, self.address, 'train_params.p')
         ydump(self.params, self.address, 'train_params.yaml')
 
         hparams = self.get_hparams(dataset_class, dataset_params)
@@ -114,8 +99,7 @@ class LearningBasedProcessing:
 
         def write_time(epoch, start_time):
             delta_t = time.time() - start_time
-            print("Amount of time spent for epochs " +
-                "{}-{}: {:.1f}s\n".format(epoch - freq_val, epoch, delta_t))
+            print("Amount of time spent for epochs " + "{}-{}: {:.1f}s\n".format(epoch - freq_val, epoch, delta_t))
             writer.add_scalar('time_spend', delta_t, epoch)
 
         def write_val(loss, best_loss):
@@ -168,8 +152,8 @@ class LearningBasedProcessing:
         optimizer.zero_grad()
         for us, xs in dataloader:
             us = dataloader.dataset.add_noise(us.cuda())
-            hat_xs = self.net(us)
-            loss = criterion(xs.cuda(), hat_xs)/len(dataloader)
+            w_hat, a_hat = self.net(us)
+            loss = criterion(xs.cuda(), w_hat)/len(dataloader)
             loss.backward()
             loss_epoch += loss.detach().cpu()
         optimizer.step()
@@ -262,13 +246,6 @@ class LearningBasedProcessing:
             }
             pdump(mondict, self.address, seq, 'results.p')
 
-    def display_test(self):
-        raise NotImplementedError
-
-
-class GyroLearningBasedProcessing(LearningBasedProcessing):
-    def __init__(self, params, net_class, net_params, address, dt):
-        super().__init__(params, net_class, net_params, address, dt)
 
     def display_test(self):
 
