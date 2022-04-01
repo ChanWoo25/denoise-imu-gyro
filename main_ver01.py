@@ -2,10 +2,10 @@
 
 import os
 import torch
-import src.learning as lr
-import src.networks as sn
-import src.losses as sl
-import src.dataset as ds
+import src.learning_dga as lr
+import src.DGANet as sn
+import src.DGALoss as sl
+import src.dataset_dga as ds
 import numpy as np
 from src.DGANet import DGANet
 
@@ -32,18 +32,6 @@ address = os.path.join(result_dir, id)
 ################################################################################
 # Network parameters
 ################################################################################
-net_class = sn.GyroNet
-net_params = {
-    'in_dim': 6,
-    'out_dim': 3,
-    'c0': 16,
-    'dropout': 0.1,
-    'ks': [7, 7, 7, 7],
-    'ds': [4, 4, 4],
-    'momentum': 0.1,
-    'gyro_std': [1*np.pi/180, 2*np.pi/180, 5*np.pi/180],
-}
-
 dga_class = DGANet
 dga_params = {
     'in_dim': 6,
@@ -105,12 +93,11 @@ train_params = {
         'weight_decay': 1e-1,
         'amsgrad': False,
     },
-    'loss_class': sl.GyroLoss,
+    'loss_class': sl.DGALoss,
     'loss': {
         'min_N': int(np.log2(dataset_params['min_train_freq'])),
         'max_N': int(np.log2(dataset_params['max_train_freq'])),
         'w':  1e6,
-        'target': 'rotation matrix',
         'huber': 0.005,
         'dt': 0.005,
     },
@@ -144,12 +131,11 @@ test_params = {
         'weight_decay': 1e-1,
         'amsgrad': False,
     },
-    'loss_class': sl.GyroLoss,
+    'loss_class': sl.DGALoss,
     'loss': {
         'min_N': int(np.log2(dataset_params['min_train_freq'])),
         'max_N': int(np.log2(dataset_params['max_train_freq'])),
         'w':  1e6,
-        'target': 'rotation matrix',
         'huber': 0.005,
         'dt': 0.005,
     },
@@ -184,11 +170,11 @@ if __name__ == '__main__':
             # print("[FATAL] -- Already trained");exit(1)
         else:
             os.mkdir(address)
-        learning_process = lr.GyroLearningBasedProcessing(train_params, net_class, net_params, address, train_params['loss']['dt'])
+        learning_process = lr.LearningProcess(train_params, dga_class, dga_params, address, train_params['loss']['dt'])
         learning_process.train(dataset_class, dataset_params)
     else:
         print("Test")
         if not os.path.exists(address):
             print("[FATAL] -- There is no pretrained");exit(1)
-        learning_process = lr.GyroLearningBasedProcessing(test_params, net_class, net_params, address, dt=train_params['loss']['dt'])
+        learning_process = lr.LearningProcess(test_params, dga_class, dga_params, address, dt=train_params['loss']['dt'])
         learning_process.test(dataset_class, dataset_params)

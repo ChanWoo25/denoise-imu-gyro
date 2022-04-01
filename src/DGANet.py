@@ -137,12 +137,17 @@ class DGANet(torch.nn.Module):
 
         C_a = (self.I3 + self.C_a).expand(us.shape[0], us.shape[1], 3, 3)
 
-        print("C_a:", C_a.shape, C_a.dtype)
-        print("a_imu:", a_imu.shape, a_imu.dtype)
-        print("self.acc_std:", self.acc_std.shape, self.acc_std.dtype)
-        print("a_tilde:", a_tilde.shape, a_tilde.dtype)
+        # print("C_a:", C_a.shape, C_a.dtype)
+        # print("a_imu:", a_imu.shape, a_imu.dtype)
+        # print("self.acc_std:", self.acc_std.shape, self.acc_std.dtype)
+        # print("a_tilde:", a_tilde.shape, a_tilde.dtype)
         a_hat = bbmv(C_a, a_imu) + self.acc_std * a_tilde
-        print("a_hat:", a_hat.shape, a_hat.dtype)
+        # print("a_hat:", a_hat.shape, a_hat.dtype)
+            # C_a: torch.Size([6, 16000, 3, 3]) torch.float32
+            # a_imu: torch.Size([6, 16000, 3]) torch.float32
+            # self.acc_std: torch.Size([3]) torch.float32
+            # a_tilde: torch.Size([6, 16000, 3]) torch.float32
+            # a_hat: torch.Size([6, 16000, 3]) torch.float32
 
 
         return w_hat, a_hat

@@ -150,10 +150,10 @@ class LearningProcess:
         """Forward-backward loop over training data"""
         loss_epoch = 0
         optimizer.zero_grad()
-        for us, xs in dataloader:
+        for us, xs, dv in dataloader:
             us = dataloader.dataset.add_noise(us.cuda())
             w_hat, a_hat = self.net(us)
-            loss = criterion(xs.cuda(), w_hat)/len(dataloader)
+            loss = criterion(w_hat, a_hat, xs.cuda(), dv.cuda())/len(dataloader)
             loss.backward()
             loss_epoch += loss.detach().cpu()
         optimizer.step()
@@ -165,9 +165,9 @@ class LearningProcess:
         self.net.eval()
         with torch.no_grad():
             for i in range(len(dataset)):
-                us, xs = dataset[i]
-                hat_xs = self.net(us.cuda().unsqueeze(0))
-                loss = criterion(xs.cuda().unsqueeze(0), hat_xs)/len(dataset)
+                us, xs, dv = dataset[i]
+                w_hat, a_hat = self.net(us.cuda().unsqueeze(0))
+                loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0))/len(dataset)
                 loss_epoch += loss.cpu()
         self.net.train()
         return loss_epoch
