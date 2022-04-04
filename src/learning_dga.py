@@ -29,6 +29,10 @@ class LearningProcess:
         self.figsize = (20, 12)
         self.dt = dt # (s)
 
+        self.gt_interpolated_dict = {
+            'MH_02_easy': np.loadtxt(os.path.join('results', 'gt', 'MH_02_easy', 'gt_interpolated.csv'), delimiter=','),
+        }
+
         self.address = address
         self.weight_path = os.path.join(self.address, 'weights.pt')
 
@@ -105,11 +109,10 @@ class LearningProcess:
         def write_val(loss, best_loss):
             if 0.5*loss <= best_loss:
                 msg = 'validation loss decreases! :) '
-                msg += '(curr/prev loss {:.4f}/{:.4f})'.format(loss.item(),
-                    best_loss.item())
+                msg += '(curr/prev loss {:.4f}/{:.4f})'.format(loss.item(), best_loss.item())
                 cprint(msg, 'green')
                 best_loss = loss
-                self.save_net()
+                self.save_net(state='best')
             else:
                 msg = 'validation loss increases! :( '
                 msg += '(curr/prev loss {:.4f}/{:.4f})'.format(loss.item(),
@@ -127,7 +130,9 @@ class LearningProcess:
                 loss = self.loop_val(dataset_val, criterion)
                 write_time(epoch, start_time)
                 best_loss = write_val(loss, best_loss)
+                self.save_net(epoch)
                 start_time = time.time()
+
         # training is over !
 
         # test on new data
@@ -172,10 +177,14 @@ class LearningProcess:
         self.net.train()
         return loss_epoch
 
-    def save_net(self):
+    def save_net(self, epoch=None, state='log'):
         """save the weights on the net in CPU"""
         self.net.eval().cpu()
-        torch.save(self.net.state_dict(), self.weight_path)
+        if state is 'log':
+            save_path = os.path.join(self.address, 'ep_%05d.pt'%epoch)
+            torch.save(self.net.state_dict(), save_path)
+        elif state is 'best':
+            torch.save(self.net.state_dict(), self.weight_path)
         self.net.train().cuda()
 
     def get_hparams(self, dataset_class, dataset_params):
@@ -221,10 +230,9 @@ class LearningProcess:
         self.net.eval()
         for i in range(len(self.dataset)):
             seq = self.dataset.sequences[i]
-            us, xs = self.dataset[i]
+            us, xs, dv = self.dataset[i]
             with torch.no_grad():
-                hat_xs = self.net(us.cuda().unsqueeze(0))
-
+                w_hat, a_hat = self.net(us.cuda().unsqueeze(0))
 
             ### DEBUG
             # print("hat_xs:", hat_xs.shape) # [1, 29952, 3]
@@ -238,14 +246,14 @@ class LearningProcess:
             #     print("\tgt_processed from {} -- shape({})".format(seq, gt_processed.shape))
             ###
 
-            loss = criterion(xs.cuda().unsqueeze(0), hat_xs)
+            loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0))
             mkdir(self.address, seq)
             mondict = {
-                'hat_xs': hat_xs[0].cpu(),
+                'w_hat': w_hat[0].cpu(),
+                'a_hat': a_hat[0].cpu(),
                 'loss': loss.cpu().item(),
             }
             pdump(mondict, self.address, seq, 'results.p')
-
 
     def display_test(self):
 
@@ -259,8 +267,10 @@ class LearningProcess:
             self.gt['Rots'] = Rots.cpu()
             self.gt['rpys'] = SO3.to_rpy(Rots).cpu()
             # get data and estimate
-            self.net_us = pload(self.address, seq, 'results.p')['hat_xs']
-            self.raw_us, _ = self.dataset[i]
+            mondict = pload(self.address, seq, 'results.p')
+            self.w_hat = mondict['w_hat']
+            self.a_hat = mondict['a_hat']
+            self.raw_us, _, _ = self.dataset[i]
 
             ###
             # print("\tself.net_us:", self.net_us.shape)
@@ -269,8 +279,9 @@ class LearningProcess:
             # print("\t\t", self.raw_us[:5])
             ###
 
-            N = self.net_us.shape[0]
-            self.gyro_corrections =  (self.raw_us[:, :3] - self.net_us[:N, :3])
+            N = self.w_hat.shape[0]
+            self.gyro_corrections  =  (self.raw_us[:, :3]  - self.w_hat[:N, :])
+            self.accel_corrections =  (self.raw_us[:, 3:6] - self.a_hat[:N, :])
             self.ts = torch.linspace(0, N*self.dt, N)
 
             self.convert()
@@ -414,7 +425,7 @@ class LearningProcess:
     def plot_gyro(self):
         N = self.raw_us.shape[0]
         raw_us = self.raw_us[:, :3]
-        net_us = self.net_us[:, :3]
+        net_us = self.w_hat[:, :3]
 
         net_qs, imu_Rots, net_Rots = self.integrate_with_quaternions_superfast(N, raw_us, net_us)
         imu_rpys = 180/np.pi*SO3.to_rpy(imu_Rots).cpu()
@@ -465,6 +476,25 @@ class LearningProcess:
             ###
         self.savefig(axs, fig, 'orientation_error')
 
+
+    def plot_accel(self):
+        N = self.raw_us.shape[0]
+        raw_acc = self.raw_us[:, 3:6]
+        net_acc = self.a_hat
+
+        raw_dv = self.dt * (raw_acc[1:] + raw_acc[:-1]) / 2.0
+        net_dv = self.dt * (net_acc[1:] + net_acc[:-1]) / 2.0
+
+        v0 = 0.0 # 임시
+
+
+        net_qs, imu_Rots, net_Rots = self.integrate_with_quaternions_superfast(N, raw_us, net_us)
+        imu_rpys = 180/np.pi*SO3.to_rpy(imu_Rots).cpu()
+        net_rpys = 180/np.pi*SO3.to_rpy(net_Rots).cpu()
+        self.plot_orientation(imu_rpys, net_rpys, N)
+        self.plot_orientation_error(imu_Rots, net_Rots, N)
+
+
     def plot_gyro_correction(self):
         title = "Gyro correction" + self.end_title
         ylabel = 'gyro correction (deg/s)'
@@ -473,6 +503,15 @@ class LearningProcess:
         plt.plot(self.ts, self.gyro_corrections, label=r'net IMU')
         ax.set_xlim(self.ts[0], self.ts[-1])
         self.savefig(ax, fig, 'gyro_correction')
+
+    def plot_accel_correction(self):
+        title = "Accel correction" + self.end_title
+        ylabel = 'accel correction ($m/s^2$)'
+        fig, ax = plt.subplots(figsize=self.figsize)
+        ax.set(xlabel='$t$ (min)', ylabel=ylabel, title=title)
+        plt.plot(self.ts, self.accel_corrections, label=r'net IMU accel')
+        ax.set_xlim(self.ts[0], self.ts[-1])
+        self.savefig(ax, fig, 'accel_correction')
 
     @property
     def end_title(self):

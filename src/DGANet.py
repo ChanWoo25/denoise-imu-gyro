@@ -20,8 +20,8 @@ def vis(xs:torch.Tensor):
 class DGANet(torch.nn.Module):
     def __init__(self, in_dim, out_dim, c0, dropout, ks, ds, momentum, gyro_std, acc_std):
         super().__init__()
-        print('GADNet is initialized.')
-        print('\tGADNet is a deep neural network for denoising IMU sensor\'s raw measurements')
+        print('DGANet is initialized.')
+        print('\tDGANet is a deep neural network for denoising IMU sensor\'s raw measurements')
         print('\t- Denoise\n\t- Gyroscope\n\t- Accelerometer\n\t- Net')
 
         self.in_dim = in_dim
