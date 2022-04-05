@@ -10,6 +10,8 @@ import numpy as np
 from src.utils import bmtm, bmtv, bmmt, bbmv
 from src.lie_algebra import SO3
 
+from termcolor import cprint
+
 
 def vis(xs:torch.Tensor):
     for x in xs:
@@ -20,9 +22,8 @@ def vis(xs:torch.Tensor):
 class DGANet(torch.nn.Module):
     def __init__(self, in_dim, out_dim, c0, dropout, ks, ds, momentum, gyro_std, acc_std):
         super().__init__()
-        print('DGANet is initialized.')
-        print('\tDGANet is a deep neural network for denoising IMU sensor\'s raw measurements')
-        print('\t- Denoise\n\t- Gyroscope\n\t- Accelerometer\n\t- Net')
+        cprint('Initilaize DGANet ...', 'green')
+        print("  It's a DNN Model for denoising IMU sensor\'s raw measurements (both gryo & accel)")
 
         self.in_dim = in_dim
         self.out_dim = out_dim
@@ -75,10 +76,9 @@ class DGANet(torch.nn.Module):
 
         ### Non-parameter member variables
         self.gt_rots = None
-        print("gt_rots' grad:", self.gt_rots)
         ###
 
-        print("Initialize End")
+        print("  -- success --\n")
 
     def set_normalized_factors(self, mean_u, std_u):
         self.mean_u = torch.nn.Parameter(mean_u.cuda(), requires_grad=False)
