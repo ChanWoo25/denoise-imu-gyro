@@ -17,23 +17,26 @@ import os
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 from src.utils import pload, pdump, yload, ydump, mkdir, bmv
-from src.utils import bmtm, bmtv, bmmt
+from src.utils import bmtm, bmtv, bmmt, bbmv
 
 
 from src.lie_algebra import SO3
-
-from src.DGANet import DGANet
-from src.DGALoss import DGALoss
 from src.DGADataset import DGADataset
 
 class LearningProcess:
-    def __init__(self, params, mode): # , net_class, net_params, address, dt
+    """
+        Manage all training and test process.
+    """
 
+    def __init__(self, params, mode): # , net_class, net_params, address, dt
+        """
+            - Make sure that a model's in gpu after initialization.
+        """
         self.params = params
         self.weight_path = os.path.join(self.params['result_dir'], 'weights.pt')
-
+        self.dict_test_result = {}
         self.figsize = (20, 12)
-        self.dt = 0.05 # (s)
+        self.dt = 0.005 # (s)
 
         self.preprocess()
 
@@ -41,17 +44,18 @@ class LearningProcess:
             if not os.path.exists(self.params['result_dir']):
                 os.makedirs(self.params['result_dir'])
             ydump(self.params, params['result_dir'], 'params.yaml')
-            self.net = DGANet(**self.params['net'])
+            self.net = params['net_class'](**params['net'])
         elif mode == 'test':
             self.params = yload(params['result_dir'], 'params.yaml')
-            self.net = DGANet(**self.params['net'])
+            self.net = params['net_class'](**params['net'])
             weights = torch.load(self.weight_path)
             self.net.load_state_dict(weights)
         else:
-            cprint("[Error] The argument '--mode' should be 'train' or 'test'", 'red')
-            exit(-1)
+            self.params = yload(params['result_dir'], 'params.yaml')
+            cprint('  No need to initialize a model', 'yellow')
+            return
 
-        self.net.cuda()
+        self.net = self.net.cuda()
 
     def preprocess(self):
 
@@ -179,9 +183,7 @@ class LearningProcess:
         n_epochs = self.params['train']['n_epochs']
 
         # init net w.r.t dataset
-        self.net = self.net.cuda()
-        mean_u, std_u = dataset_train.mean_u, dataset_train.std_u
-        self.net.set_normalized_factors(mean_u, std_u)
+        self.net.set_normalized_factors(torch.Tensor(dataset_train.mean_u), torch.Tensor(dataset_train.std_u))
 
         # start tensorboard writer
         writer = SummaryWriter(self.params['result_dir'])
@@ -189,69 +191,142 @@ class LearningProcess:
         best_loss = torch.Tensor([float('Inf')])
 
         # define some function for seeing evolution of training
-        def write(epoch, loss_epoch):
-            writer.add_scalar('loss/train', loss_epoch.item(), epoch)
-            writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
-            if epoch % 200 == 0:
-                print('Train Epoch: {:2d} \tLoss: {:.4f}'.format(epoch, loss_epoch.item()))
-            scheduler.step(epoch)
+        # def write(epoch, loss_epoch):
+        #     scheduler.step(epoch)
 
-        def write_time(epoch, start_time):
-            delta_t = time.time() - start_time
-            print("Amount of time spent for epochs " + "{}-{}: {:.1f}s\n".format(epoch - freq_val, epoch, delta_t))
-            writer.add_scalar('time_spend', delta_t, epoch)
-
-        def write_val(loss, best_loss):
-            if 0.5*loss <= best_loss:
-                msg = 'validation loss decreases! :) '
-                msg += '(curr/prev loss {:.4f}/{:.4f})'.format(loss.item(), best_loss.item())
-                cprint(msg, 'green')
-                best_loss = loss
-                self.save_net(state='best')
-            else:
-                msg = 'validation loss increases! :( '
-                msg += '(curr/prev loss {:.4f}/{:.4f})'.format(loss.item(),
-                    best_loss.item())
-                cprint(msg, 'yellow')
-            writer.add_scalar('loss/val', loss.item(), epoch)
-            return best_loss
-
-        # training loop !
+        # Training Loop
+        loss, best_loss = torch.Tensor([0.0]), torch.Tensor([10000.0])
         for epoch in range(1, n_epochs + 1):
             loss_epoch = self.loop_train(dataloader, optimizer, criterion)
-            write(epoch, loss_epoch)
+            writer.add_scalar('loss/train', loss_epoch.item(), epoch)
+            writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
             scheduler.step(epoch)
+
+            # Validate
             if epoch % freq_val == 0:
                 loss = self.loop_val(dataset_val, criterion)
-                write_time(epoch, start_time)
-                best_loss = write_val(loss, best_loss)
-                self.save_net(epoch)
+                dt = time.time() - start_time
+
+                if loss <= best_loss:
+                    cprint('Epoch %4d Loss(val) Decrease - %.2fs' % (epoch, dt), 'blue')
+                    print('  - current: %.4f' % loss.item())
+                    print('  - best   : %.4f' % best_loss.item())
+                    best_loss = loss
+                    self.save_net(epoch, 'best')
+                else:
+                    cprint('Epoch %4d Loss(val) Increase - %.2fs' % (epoch, dt), 'yellow')
+                    print('  - current: %.4f' % loss.item())
+                    print('  - best   : %.4f' % best_loss.item())
+                    self.save_net(epoch, 'log')
+
+                writer.add_scalar('loss/val', loss.item(), epoch)
                 start_time = time.time()
+            elif epoch % (freq_val//5) == 0:
+                cprint('Epoch %4d Loss(train) %.4f' % (epoch, loss_epoch), 'grey')
 
-        cprint('Train is over', 'cyan', attrs=['bold'])
-        # test on new data
+
+        cprint('\n  Train is over  \n', 'cyan', attrs=['bold'])
+
+        cprint('Testing ... ', 'green')
         dataset_test = DGADataset(**self.params['dataset'], mode='test')
-
         weights = torch.load(self.weight_path)
         self.net.load_state_dict(weights)
         self.net.cuda()
-
         test_loss = self.loop_val(dataset_test, criterion)
         dict_loss = {
             'final_loss/val': best_loss.item(),
             'final_loss/test': test_loss.item()
-            }
-
+        }
+        for key, value in dict_loss.items():
+            print('  %s: ' % key, value)
         ydump(dict_loss, self.params['result_dir'], 'final_loss.yaml')
+
         writer.close()
+
+    def test(self):
+        """test a network once training is over"""
+        Loss = self.params['train']['loss_class']
+        criterion = Loss(**self.params['train']['loss'])
+        dataset_test = DGADataset(**self.params['dataset'], mode='test')
+
+        if not os.path.exists(self.params['test_dir']):
+            os.makedirs(self.params['test_dir'])
+
+        cprint('Test ... ', 'green')
+        self.loop_test(dataset_test, criterion)
+        print('  --success')
+
+    def analyze(self):
+        dataset_test = DGADataset(**self.params['dataset'], mode='test')
+
+
+        for i, seq in enumerate(dataset_test.sequences):
+            self.seq = seq
+            if not os.path.exists(os.path.join(self.params['result_dir'], seq)):
+                os.mkdir(os.path.join(self.params['result_dir'], seq))
+            cprint('On %s ... ' % seq, 'green', end='')
+            us, dxi_ij, delta_v_gt, gt_interpolated = dataset_test[i]
+            # print('  us: ', us.shape)
+            # print('  dxi_ij: ', dxi_ij.shape)
+            # print('  delta_v_gt: ', delta_v_gt.shape)
+            # print('  gt_interpolated: ', gt_interpolated.shape)
+
+            pos_gt = gt_interpolated[:, 1:4]
+            quat_gt = gt_interpolated[:, 4:8]
+            vel_gt = gt_interpolated[:, 8:11]
+            # print('  pos_gt: ', pos_gt.shape)
+            # print('  quat_gt: ', quat_gt.shape)
+            # print('  vel_gt: ', vel_gt.shape)
+
+
+            mondict = pload(self.params['result_dir'], 'tests', 'results_%s.p'%seq)
+            w_hat = mondict['w_hat']
+            a_hat = mondict['a_hat']
+            loss = mondict['loss']
+            # print('  w_hat: ', w_hat.shape)
+            # print('  a_hat: ', a_hat.shape)
+
+            N = us.shape[0]
+            rot_gt = SO3.from_quaternion(quat_gt.cuda()).cpu()
+            rpy_gt = SO3.to_rpy(rot_gt.cuda()).cpu()
+            self.ts = torch.linspace(0, N * self.dt, N)
+
+            def rad2deg(x):
+                return x * (180. / np.pi)
+
+            quat_hat, rot_imu, rot_hat = self.integrate_with_quaternions_superfast(dxi_ij.shape[0], us, w_hat, quat_gt)
+            rpy_imu = SO3.to_rpy(rot_imu).cpu()
+            rpy_hat = SO3.to_rpy(rot_hat).cpu()
+            self.plot_orientation(N, rad2deg(rpy_imu), rad2deg(rpy_hat), rad2deg(rpy_gt))
+            self.plot_orientation_error(N, rot_imu, rot_hat, rot_gt)
+
+            gyro_corrections  =  (us[:, :3]  - w_hat[:N, :])
+
+            rot_gt = SO3.from_quaternion(quat_gt.cuda()).cpu()
+            rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
+            a_w = bmv(rot_gt, us[:, 3:6]) - torch.Tensor([0., 0., 9.81])
+            accel_corrections =  (a_w - a_hat)
+            self.plot_gyro_correction(gyro_corrections)
+            self.plot_accel_correction(accel_corrections)
+
+            self.plot_accel(a_hat, gt_interpolated)
+
+            cprint('[ok]\n', 'blue')
+
+
+        # self.display_test(dataset_test)
 
     def loop_train(self, dataloader, optimizer, criterion):
         """Forward-backward loop over training data"""
         loss_epoch = 0
         optimizer.zero_grad()
-        for us, xs, dv in dataloader:
+        for us, xs, dv, gt in dataloader:
             us = dataloader.dataset.add_noise(us.cuda())
-            w_hat, a_hat = self.net(us)
+            q_gt = gt[:, :, 4:8].reshape(-1, 4)
+            rot_gt = SO3.from_quaternion(q_gt.cuda())
+            rot_gt = rot_gt.reshape(us.shape[0], us.shape[1], 3, 3)
+
+            w_hat, a_hat = self.net(us, rot_gt)
             loss = criterion(w_hat, a_hat, xs.cuda(), dv.cuda())/len(dataloader)
             loss.backward()
             loss_epoch += loss.detach().cpu()
@@ -264,98 +339,111 @@ class LearningProcess:
         self.net.eval()
         with torch.no_grad():
             for i in range(len(dataset)):
-                us, xs, dv = dataset[i]
-                w_hat, a_hat = self.net(us.cuda().unsqueeze(0))
-                loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0))/len(dataset)
+                us, xs, dv, gt = dataset[i]
+                q_gt = gt[:, 4:8]
+                rot_gt = SO3.from_quaternion(q_gt.cuda())
+                rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
+
+                w_hat, a_hat = self.net(us.cuda().unsqueeze(0), rot_gt.cuda().unsqueeze(0), 'val')
+                loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0), 'val')/len(dataset)
                 loss_epoch += loss.cpu()
         self.net.train()
         return loss_epoch
 
+    def loop_test(self, dataset, criterion):
+        """Forward loop over test data"""
+        self.net.eval()
+
+        for i in range(len(dataset)):
+            seq = dataset.sequences[i]
+            us, xs, dv, gt = dataset[i]
+            q_gt = gt[:, 4:8]
+            rot_gt = SO3.from_quaternion(q_gt.cuda())
+            rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
+            print('  - %s  ' % seq, end='')
+            # print('  us:', us.shape)
+            # print('  xs:', xs.shape)
+            # print('  dv:', dv.shape)
+
+            with torch.no_grad():
+                w_hat, a_hat = self.net(us.cuda().unsqueeze(0), rot_gt.cuda().unsqueeze(0))
+                loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0))
+                self.dict_test_result[seq] = {
+                    'w_hat': w_hat[0].cpu(),
+                    'a_hat': a_hat[0].cpu(),
+                    'loss': loss.cpu().item(),
+                }
+                for key, value in self.dict_test_result[seq].items():
+                    if key == 'loss':
+                        continue
+                    print('    %s:'%key, type(value), value.shape, value.dtype)
+
+                path_results = os.path.join(self.params['test_dir'], 'results_%s.p'%seq)
+                if not os.path.exists(path_results):
+                    pdump(self.dict_test_result[seq], path_results)
+            print('[ok]')
+
     def save_net(self, epoch=None, state='log'):
         """save the weights on the net in CPU"""
         self.net.eval().cpu()
-        if state is 'log':
-            save_path = os.path.join(self.params['result_dir'], 'ep_%05d.pt'%epoch)
+        if state == 'log':
+            save_path = os.path.join(self.params['result_dir'], 'ep_%04d.pt' % epoch)
             torch.save(self.net.state_dict(), save_path)
-        elif state is 'best':
+        elif state == 'best':
+            save_path = os.path.join(self.params['result_dir'], 'ep_%04d_best.pt' % epoch)
+            torch.save(self.net.state_dict(), save_path)
             torch.save(self.net.state_dict(), self.weight_path)
         self.net.train().cuda()
 
-    def test(self):
-        """test a network once training is over"""
+    def display_test(self, dataset):
 
-        # get loss function
-        Loss = self.params['loss_class']
-        loss_params = self.params['loss']
-        criterion = Loss(**loss_params)
+        # self.to_open_vins(dataset)
 
-        self.dataset = DGADataset(mode='test',**self.params['dataset'])
-        self.loop_test(criterion)
-        self.display_test()
+        for i, seq in enumerate(dataset.sequences):
+            print('  - %s  ' % seq, end='')
 
-    def loop_test(self, criterion):
-        """Forward loop over test data"""
-        self.net.eval()
-        for i in range(len(self.dataset)):
-            seq = self.dataset.sequences[i]
-            us, xs, dv = self.dataset[i]
-            with torch.no_grad():
-                w_hat, a_hat = self.net(us.cuda().unsqueeze(0))
+            # Load
+            mondict = dataset.load_seq(i)
+            ts = mondict['ts']
+            us = mondict['us']
+            dxi_ij = mondict['dxi_ij']
+            gt_interpolated = mondict['gt_interpolated']
+            delta_v_gt = mondict['delta_v_gt']
+            pos_gt = gt_interpolated[:, 1:4]
+            quat_gt = gt_interpolated[:, 4:8]
+            vel_gt = gt_interpolated[:, 8:11]
 
-            ### DEBUG
-            # print("hat_xs:", hat_xs.shape) # [1, 29952, 3]
-            # if seq in ['MH_02_easy', 'MH_04_difficult']:
-            #     print("Test -- MH_02_easy")
-            #     print("\tus:", us.shape)
-            #     print("\txs:", xs.shape)
-            #     print("\that_xs:", hat_xs.shape)
-            #     gt_processed_path = os.path.join("/root/Data/Result/DenoiseIMU/gt", seq, "gt_processed.csv")
-            #     gt_processed = np.loadtxt(gt_processed_path, delimiter=',')
-            #     print("\tgt_processed from {} -- shape({})".format(seq, gt_processed.shape))
-            ###
 
-            loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0))
-            mkdir(self.params['result_dir'], seq)
-            mondict = {
-                'w_hat': w_hat[0].cpu(),
-                'a_hat': a_hat[0].cpu(),
-                'loss': loss.cpu().item(),
-            }
-            pdump(mondict, self.params['result_dir'], seq, 'results.p')
+            rot_gt = SO3.from_quaternion(quat_gt.cuda()).cpu()
+            rpy_gt = SO3.to_rpy(rot_gt.cuda()).cpu()
 
-    def display_test(self):
+            # self.gt['Rots'] = Rots.cpu()
+            # self.gt['rpys'] = SO3.to_rpy(Rots).cpu()
 
-        self.to_open_vins()
-        for i, seq in enumerate(self.dataset.sequences):
-            # print('\n', 'Results for sequence ' + seq )
-            self.seq = seq
-            # get ground truth
-            self.gt = self.dataset.load_gt(i)
-            Rots = SO3.from_quaternion(self.gt['qs'].cuda())
-            self.gt['Rots'] = Rots.cpu()
-            self.gt['rpys'] = SO3.to_rpy(Rots).cpu()
             # get data and estimate
-            mondict = pload(self.params['result_dir'], seq, 'results.p')
-            self.w_hat = mondict['w_hat']
-            self.a_hat = mondict['a_hat']
-            self.raw_us, _, _ = self.dataset[i]
+            mondict = pload(self.params['result_dir'], 'results_%s.p'%seq)
+            w_hat = mondict['w_hat']
+            a_hat = mondict['a_hat']
+            loss = mondict['loss']
 
-            ###
-            # print("\tself.net_us:", self.net_us.shape)
-            # print("\t\t", self.net_us[:5])
-            # print("\tself.raw_us:", self.raw_us.shape)
-            # print("\t\t", self.raw_us[:5])
-            ###
+            self.raw_us, _, _, _ = dataset[i]
 
-            N = self.w_hat.shape[0]
-            self.gyro_corrections  =  (self.raw_us[:, :3]  - self.w_hat[:N, :])
-            self.accel_corrections =  (self.raw_us[:, 3:6] - self.a_hat[:N, :])
-            self.ts = torch.linspace(0, N*self.dt, N)
+            N = self.us.shape[0]
+            self.gyro_corrections  =  (us[:, :3]  - w_hat[:N, :])
+            self.accel_corrections =  (us[:, 3:6] - a_hat[:N, :])
+            self.ts = torch.linspace(0, N * self.dt, N)
 
-            self.convert()
-            self.plot_gyro()
+            def rad2deg(x):
+                return x * (180. / np.pi)
+
+            quat_hat, rot_imu, rot_hat = self.integrate_with_quaternions_superfast(N, us, w_hat)
+            imu_rpys = 180/np.pi*SO3.to_rpy(rot_imu).cpu()
+            net_rpys = 180/np.pi*SO3.to_rpy(rot_hat).cpu()
+
+            self.plot_orientation(imu_rpys, net_rpys, N)
+            self.plot_orientation_error(rot_imu, rot_hat, N)
             self.plot_gyro_correction()
-            # plt.show()
+            cprint('[ok]', 'blue')
 
     def save_gyro_estimate(self, seq):
         net_us = pload(self.params['result_dir'], seq, 'results.p')['hat_xs']
@@ -365,18 +453,18 @@ class LearningProcess:
         x = np.zeros(N, 4)
         x[:, 0]
 
-    def to_open_vins(self):
+    def to_open_vins(self, dataset):
         """
         Export results to Open-VINS format. Use them eval toolbox available
         at https://github.com/rpng/open_vins/
         """
         print("open_vins()")
 
-        for i, seq in enumerate(self.dataset.sequences):
+        for i, seq in enumerate(dataset.sequences):
             self.seq = seq
             # get ground truth
-            self.gt = self.dataset.load_gt(i)
-            raw_us, _ = self.dataset[i]
+            self.gt = dataset.load_gt(i)
+            raw_us, _ = dataset[i]
             net_us = pload(self.params['result_dir'], seq, 'results.p')['hat_xs']
             N = net_us.shape[0]
 
@@ -452,21 +540,10 @@ class LearningProcess:
             print("raw imu rpy is saved in \'%s\'" % imu_rpys_path)
             print("net imu rpy is saved in \'%s\'" % net_rpys_path)
 
-
-    def convert(self):
-        # s -> min
-        l = 1/60
-        self.ts *= l
-
-        # rad -> deg
-        l = 180/np.pi
-        self.gyro_corrections *= l
-        self.gt['rpys'] *= l
-
-    def integrate_with_quaternions_superfast(self, N, raw_us, net_us):
+    def integrate_with_quaternions_superfast(self, N, raw_us, net_us, quat_gt):
         imu_qs = SO3.qnorm(SO3.qexp(raw_us[:, :3].cuda().double()*self.dt))
         net_qs = SO3.qnorm(SO3.qexp(net_us[:, :3].cuda().double()*self.dt))
-        Rot0 = SO3.qnorm(self.gt['qs'][:2].cuda().double())
+        Rot0 = SO3.qnorm(quat_gt[:2].cuda().double())
         imu_qs[0] = Rot0[0]
         net_qs[0] = Rot0[0]
 
@@ -479,10 +556,10 @@ class LearningProcess:
         if int(N) < N:
             k = 2**int(N)
             k2 = imu_qs[k:].shape[0]
-            print("[integrate_with_quaternions_superfast()]")
-            print("imu_qs: ", imu_qs.shape)
-            print("k: %d, k2: %d"%(k, k2))
-            print("qmul with %d x %d" % (imu_qs[:k2].shape[0], imu_qs[k:].shape[0]))
+            # print("imu_qs: ", imu_qs.shape)
+            # print("k: %d, k2: %d"%(k, k2))
+            # print("imu_qs: qmul with %d x %d" % (imu_qs[:k2].shape[0], imu_qs[k:].shape[0]))
+            # print("net_qs: qmul with %d x %d" % (net_qs[:k2].shape[0], net_qs[k:].shape[0]))
             imu_qs[k:] = SO3.qnorm(SO3.qmul(imu_qs[:k2], imu_qs[k:]))
             net_qs[k:] = SO3.qnorm(SO3.qmul(net_qs[:k2], net_qs[k:]))
 
@@ -501,31 +578,85 @@ class LearningProcess:
         self.plot_orientation(imu_rpys, net_rpys, N)
         self.plot_orientation_error(imu_Rots, net_Rots, N)
 
-    def plot_orientation(self, imu_rpys, net_rpys, N):
+    def plot_accel(self, a_hat, gt_interpolated):
+
+        pos_gt = gt_interpolated[:, 1:4]
+        vel_gt = gt_interpolated[:, 8:11]
+
+        fig, axs = plt.subplots(3, 1, sharex=True, figsize=self.figsize)
+        axs[0].plot(self.ts, vel_gt[:, 0], color='red', label='$v_x$ [m/s]')
+        axs[1].plot(self.ts, vel_gt[:, 1], color='blue', label='$v_y$ [m/s]')
+        axs[2].plot(self.ts, vel_gt[:, 2], color='black', label='$v_z$ [m/s]')
+        self.savefig(axs, fig, 'velocity_gt')
+        plt.close(fig)
+
+        fig, axs = plt.subplots(3, 1, sharex=True, figsize=self.figsize)
+        axs[0].plot(self.ts, pos_gt[:, 0], color='red', label='$p_x$ [m]')
+        axs[1].plot(self.ts, pos_gt[:, 1], color='blue', label='$p_y$ [m]')
+        axs[2].plot(self.ts, pos_gt[:, 2], color='black', label='$p_z$ [m]')
+        self.savefig(axs, fig, 'position_gt')
+        plt.close(fig)
+
+        # 1 (2와 똑같이 나옴, 2 구현이 더 직관적)
+        # dv = self.dt * (a_hat[1:] + a_hat[:-1]) / 2.0
+        # v_hat = torch.ones_like(vel_gt, dtype=torch.float32) * vel_gt[0, :]
+        # print('v_hat:', v_hat.shape)
+        # print(v_hat)
+        # print('a_hat:', a_hat.shape)
+        # print('vel_gt:', vel_gt.shape)
+        # print('dv:', dv.shape)
+        # for i in range(dv.shape[0]):
+        #     v_hat[i+1:] += dv[:dv.shape[0]-i]
+        # fig, axs = plt.subplots(3, 1, sharex=True, figsize=self.figsize)
+        # axs[0].plot(self.ts, v_hat[:, 0], color='red', label='$v_x$ [m/s]')
+        # axs[1].plot(self.ts, v_hat[:, 1], color='blue', label='$v_y$ [m/s]')
+        # axs[2].plot(self.ts, v_hat[:, 2], color='black', label='$v_z$ [m/s]')
+        # self.savefig(axs, fig, 'vel_estimate_1')
+        # plt.close(fig)
+
+        # 2
+        dv = self.dt * (a_hat[1:] + a_hat[:-1]) / 2.0
+        v_hat = torch.ones_like(vel_gt, dtype=torch.float32)
+        v_hat[0] = vel_gt[0]
+        v_hat[1:] = dv
+        for i in range(1, v_hat.shape[0]):
+            v_hat[i] += v_hat[i-1]
+        fig, axs = plt.subplots(3, 1, sharex=True, figsize=self.figsize)
+        axs[0].plot(self.ts, v_hat[:, 0], color='red', label='$v_x$ [m/s]')
+        axs[1].plot(self.ts, v_hat[:, 1], color='blue', label='$v_y$ [m/s]')
+        axs[2].plot(self.ts, v_hat[:, 2], color='black', label='$v_z$ [m/s]')
+        self.savefig(axs, fig, 'vel_estimate')
+        plt.close(fig)
+
+
+
+    def plot_orientation(self, N, rpy_imu, rpy_hat, rpy_gt):
         title = "Orientation estimation"
-        gt = self.gt['rpys'][:N]
+
+        # print("rpy_imu:", rpy_imu.shape, rpy_imu.dtype)
+        # print("rpy_hat:", rpy_hat.shape, rpy_hat.dtype)
+        # print("rpy_gt:", rpy_gt.shape, rpy_gt.dtype)
+
+        rpy_gt = rpy_gt[:N]
+
         fig, axs = plt.subplots(3, 1, sharex=True, figsize=self.figsize)
         axs[0].set(ylabel='roll (deg)', title=title)
         axs[1].set(ylabel='pitch (deg)')
         axs[2].set(xlabel='$t$ (min)', ylabel='yaw (deg)')
 
         for i in range(3):
-            axs[i].plot(self.ts, gt[:, i]%360, color='black', label=r'ground truth')
-            axs[i].plot(self.ts, imu_rpys[:, i]%360, color='red', label=r'raw IMU')
-            axs[i].plot(self.ts, net_rpys[:, i]%360, color='blue', label=r'net IMU')
+            axs[i].plot(self.ts, rpy_imu[:, i]%360, color='red', label=r'raw IMU')
+            axs[i].plot(self.ts, rpy_hat[:, i]%360, color='blue', label=r'net IMU')
+            axs[i].plot(self.ts, rpy_gt[:, i]%360, color='black', label=r'ground truth')
             axs[i].set_xlim(self.ts[0], self.ts[-1])
-            ### Save csv file
-            # header = 'time,roll,pitch,yaw'
-            # np.savetxt(os.path.join(self.params['result_dir'], self.dataset.sequences[i] + '_gt_rpys.csv'), np.stack((self.tx, gt[:,i]), axis=1), fmt='%1.9f', delimiter=',', header=header)
-            # np.savetxt(os.path.join(self.params['result_dir'], self.dataset.sequences[i] + '_imu_rpys.csv'), np.stack((self.tx, imu_rpys[:,i]), axis=1), fmt='%1.9f', delimiter=',', header=header)
-            # np.savetxt(os.path.join(self.params['result_dir'], self.dataset.sequences[i] + '_net_rpys.csv'), np.stack((self.tx, net_rpys[:,i]), axis=1), fmt='%1.9f', delimiter=',', header=header)
-            ###
-        self.savefig(axs, fig, 'orientation')
 
-    def plot_orientation_error(self, imu_Rots, net_Rots, N):
-        gt = self.gt['Rots'][:N].cuda()
-        raw_err = 180/np.pi*SO3.log(bmtm(imu_Rots, gt)).cpu()
-        net_err = 180/np.pi*SO3.log(bmtm(net_Rots, gt)).cpu()
+        self.savefig(axs, fig, 'orientation')
+        plt.close(fig)
+
+    def plot_orientation_error(self, N, rot_imu, rot_hat, rot_gt):
+        rot_gt = rot_gt[:N].cuda()
+        err_imu = 180/np.pi*SO3.log(bmtm(rot_imu, rot_gt)).cpu()
+        err_hat = 180/np.pi*SO3.log(bmtm(rot_hat, rot_gt)).cpu()
         title = "$SO(3)$ orientation error"
         fig, axs = plt.subplots(3, 1, sharex=True, figsize=self.figsize)
         axs[0].set(ylabel='roll (deg)', title=title)
@@ -533,53 +664,55 @@ class LearningProcess:
         axs[2].set(xlabel='$t$ (min)', ylabel='yaw (deg)')
 
         for i in range(3):
-            axs[i].plot(self.ts, raw_err[:, i], color='red', label=r'raw IMU')
-            axs[i].plot(self.ts, net_err[:, i], color='blue', label=r'net IMU')
-            axs[i].set_ylim(-10, 10)
+            axs[i].plot(self.ts, err_imu[:, i], color='red', label=r'raw IMU')
+            axs[i].plot(self.ts, err_hat[:, i], color='blue', label=r'net IMU')
             axs[i].set_xlim(self.ts[0], self.ts[-1])
-            ### Save csv file
-            # header = 'time,roll,pitch,yaw'
-            # np.savetxt(os.path.join(self.params['result_dir'], self.dataset.sequences[i] + '_raw_err.csv'), np.stack((self.ts, raw_err[:,i]), axis=1), fmt='%1.9f', delimiter=',', header=header)
-            # np.savetxt(os.path.join(self.params['result_dir'], self.dataset.sequences[i] + '_net_err.csv'), np.stack((self.ts, net_err[:,i]), axis=1), fmt='%1.9f', delimiter=',', header=header)
-            ###
+
         self.savefig(axs, fig, 'orientation_error')
+        plt.close(fig)
 
 
-    def plot_accel(self):
-        N = self.raw_us.shape[0]
-        raw_acc = self.raw_us[:, 3:6]
-        net_acc = self.a_hat
+    # def plot_accel(self, a_hat, dv_gt, dp_gt):
+    #     N = self.raw_us.shape[0]
+    #     raw_acc = self.raw_us[:, 3:6]
+    #     net_acc = self.a_hat
 
-        raw_dv = self.dt * (raw_acc[1:] + raw_acc[:-1]) / 2.0
-        net_dv = self.dt * (net_acc[1:] + net_acc[:-1]) / 2.0
+    #     raw_dv = self.dt * (raw_acc[1:] + raw_acc[:-1]) / 2.0
+    #     net_dv = self.dt * (net_acc[1:] + net_acc[:-1]) / 2.0
 
-        v0 = 0.0 # 임시
-
-
-        net_qs, imu_Rots, net_Rots = self.integrate_with_quaternions_superfast(N, raw_us, net_us)
-        imu_rpys = 180/np.pi*SO3.to_rpy(imu_Rots).cpu()
-        net_rpys = 180/np.pi*SO3.to_rpy(net_Rots).cpu()
-        self.plot_orientation(imu_rpys, net_rpys, N)
-        self.plot_orientation_error(imu_Rots, net_Rots, N)
+    #     v0 = 0.0 # 임시
 
 
-    def plot_gyro_correction(self):
+    #     net_qs, imu_Rots, net_Rots = self.integrate_with_quaternions_superfast(N, raw_us, net_us)
+    #     imu_rpys = 180/np.pi*SO3.to_rpy(imu_Rots).cpu()
+    #     net_rpys = 180/np.pi*SO3.to_rpy(net_Rots).cpu()
+    #     self.plot_orientation(imu_rpys, net_rpys, N)
+    #     self.plot_orientation_error(imu_Rots, net_Rots, N)
+
+
+    def plot_gyro_correction(self, gyro_corrections):
         title = "Gyro correction" + self.end_title
         ylabel = 'gyro correction (deg/s)'
         fig, ax = plt.subplots(figsize=self.figsize)
         ax.set(xlabel='$t$ (min)', ylabel=ylabel, title=title)
-        plt.plot(self.ts, self.gyro_corrections, label=r'net IMU')
-        ax.set_xlim(self.ts[0], self.ts[-1])
-        self.savefig(ax, fig, 'gyro_correction')
+        plt.plot(self.ts, gyro_corrections[:, 0], label='correction of $w_x$')
+        plt.plot(self.ts, gyro_corrections[:, 1], label='correction of $w_y$')
+        plt.plot(self.ts, gyro_corrections[:, 2], label='correction of $w_z$')
 
-    def plot_accel_correction(self):
+        self.savefig(ax, fig, 'gyro_correction')
+        plt.close(fig)
+
+    def plot_accel_correction(self, accel_corrections):
         title = "Accel correction" + self.end_title
         ylabel = 'accel correction ($m/s^2$)'
         fig, ax = plt.subplots(figsize=self.figsize)
         ax.set(xlabel='$t$ (min)', ylabel=ylabel, title=title)
-        plt.plot(self.ts, self.accel_corrections, label=r'net IMU accel')
-        ax.set_xlim(self.ts[0], self.ts[-1])
+        plt.plot(self.ts, accel_corrections[:, 0], label='correction of $a_x$')
+        plt.plot(self.ts, accel_corrections[:, 1], label='correction of $a_y$')
+        plt.plot(self.ts, accel_corrections[:, 2], label='correction of $a_z$')
+
         self.savefig(ax, fig, 'accel_correction')
+        plt.close(fig)
 
     @property
     def end_title(self):

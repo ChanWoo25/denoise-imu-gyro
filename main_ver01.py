@@ -3,7 +3,10 @@ import numpy as np
 import torch
 
 from src.DGAProcess import LearningProcess
+
 from src.DGALoss import DGALoss
+from src.DGANet import DGANet
+from src.DGANetV2 import DGANetV2
 
 from termcolor import cprint
 
@@ -12,11 +15,14 @@ import argparse
 parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('--mode', type=str, default='train')
 parser.add_argument('--id', type=str, default=None)
+parser.add_argument('-c', type=int, default=-1)
+parser.add_argument('--lr', type=float, default=-1.0)
 args = parser.parse_args()
 print(args.__dict__)
 
 params = {
     'result_dir': os.path.join('/root/denoise/results', args.id),
+    'test_dir': os.path.join('/root/denoise/results', args.id, 'tests'),
 
     'dataset': {
         'train_seqs': [
@@ -28,12 +34,11 @@ params = {
             'V2_03_difficult'
         ],
         'val_seqs': [
-            'MH_01_easy',
-            'MH_03_medium',
-            'MH_05_difficult',
-            'V1_02_medium',
-            'V2_01_easy',
-            'V2_03_difficult',
+            'MH_02_easy',
+            'MH_04_difficult',
+            'V2_02_medium',
+            'V1_03_difficult',
+            'V1_01_easy',
         ],
         'test_seqs': [
             'MH_02_easy',
@@ -50,6 +55,7 @@ params = {
         'max_train_freq': 32,
     },
 
+    'net_class': DGANet,
     'net': {
         'in_dim': 6,
         'out_dim': 6,
@@ -91,18 +97,48 @@ params = {
         },
 
         # frequency of validation step
-        'freq_val': 600,
+        'freq_val': 200,
         # total number of epochs
         'n_epochs': 6000,
     }
 }
 
+# params['net_class'] = DGANetV2
+# params['net'] = {
+#     'in_dim':  6,
+#     'out_dim': 6,
+#     'channel': [32, 64, 64, 128, 128, 256],
+#     'kernal':  [5,  5,  5,  5,   5,   5],
+#     'dilation':[2,  4,  8,  16,   32,   64],
+#     'stride':  [1,  1,  1,  1,   1,   1],
+#     'momentum': 0.1,
+#     'gyro_std': [1*np.pi/180, 2*np.pi/180, 5*np.pi/180],
+#     'acc_std': [2.0e-3, 2.0e-3, 2.0e-3],
+# }
+
+params['net']['c0'] = 32 # 220407_loss_l2_0
+# params['net']['c0'] = 64
+
 if __name__ == '__main__':
+    if args.c is not -1:
+        params['net']['c0'] = args.c
+        cprint('Note :: params/net/c0 = %d' % args.c, 'green')
+    if args.lr >= 0:
+        params['train']['optimizer']['lr'] = args.lr
+        cprint('Note :: params/train/optimizer/lr = %d' % args.lr, 'green')
+
+
     process = LearningProcess(params, args.mode)
 
+
     if args.mode == 'train':
-        cprint('Train Start', 'cyan', attrs=['bold'])
+        cprint('\n========== Train ==========\n', 'cyan', attrs=['bold'])
         process.train()
     elif args.mode == 'test':
-        cprint('\n========== Test ==========\n', 'green')
+        cprint('\n========== Test ==========\n', 'cyan', attrs=['bold'])
         process.test()
+    elif args.mode == 'anal':
+        cprint('\n========== Analysis ==========\n', 'cyan', attrs=['bold'])
+        process.analyze()
+    else:
+        cprint("argument 'mode' must be one of ['train', 'test', 'anal']", 'red')

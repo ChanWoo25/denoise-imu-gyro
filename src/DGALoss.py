@@ -31,7 +31,7 @@ class DGALoss(torch.nn.Module):
         loss = self.w * self.sl(rs/self.huber, torch.zeros_like(rs)) * (self.huber**2)
         return loss
 
-    def forward(self, w_hat, a_hat, xs, dv):
+    def forward(self, w_hat, a_hat, xs, dv, mode='train'):
         """Forward errors with rotation matrices"""
         # print("DGA Loss :: forward() :: Debugging")
         N = xs.shape[0]
@@ -67,27 +67,30 @@ class DGALoss(torch.nn.Module):
         # print("dv_hat:", dv_hat.shape, dv_hat.dtype)
         # torch.Size([96000, 3]) torch.float64
 
+        _scale = 1.0
         for k in range(self.min_N): # 4
             dv_hat = dv_hat[::2] + dv_hat[1::2]
         # print("dv_hat:", dv_hat.shape, dv_hat.dtype)
         # dv_hat: torch.Size([6000, 3]) torch.float64
-        acc_loss_16 = self.sl(dv, dv_hat) * 10.0
+        acc_loss_16 = ((dv - dv_hat)**2).sum() * _scale
 
         # compute increment from min_train_freq to max_train_freq
         for k in range(self.min_N, self.max_N):
             dv_hat = dv_hat[::2] + dv_hat[1::2]
             dv = dv[::2] + dv[1::2]
-            acc_loss_32 = self.sl(dv, dv_hat) * 10.0
+            acc_loss_32 = ((dv - dv_hat)**2).sum() * _scale
         ###
         # print("Gyro Loss16:", gyro_loss_16.item())
         # print("Gyro Loss32:", gyro_loss_32.item())
         # print("Acc  Loss16:",  acc_loss_16.item())
         # print("Acc  Loss32:",  acc_loss_32.item())
 
-        ratio = np.array([gyro_loss_16.item(), gyro_loss_32.item(), acc_loss_16.item(), acc_loss_16.item()])
-        ratio /= ratio.sum()
-        ratio *= 100.0
-        # print("Ratio :: (%.2f, %.2f, %.2f, %.2f)" % (ratio[0], ratio[1], ratio[2], ratio[3]))
+        if mode is 'val':
+            ratio = np.array([gyro_loss_16.item(), gyro_loss_32.item(), acc_loss_16.item(), acc_loss_16.item()])
+            ratio /= ratio.sum()
+            ratio *= 100.0
+            print("Loss  :: (%.2f, %.2f, %.2f, %.2f)" % (gyro_loss_16.item(), gyro_loss_32.item(), acc_loss_16.item(), acc_loss_16.item()))
+            print("Ratio :: (%.2f%:%.2f%:%.2f%:%.2f%)" % (ratio[0], ratio[1], ratio[2], ratio[3]))
 
         """ -- Training --
             DGA Loss :: forward() :: Debugging

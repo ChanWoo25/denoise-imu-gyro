@@ -35,6 +35,7 @@ class DGADataset(Dataset):
         self.min_train_freq = min_train_freq
         self.max_train_freq = max_train_freq
         self.mode = mode
+        self.sequences = self.seq_dict[mode]
         self.dt = 0.05
 
         self.path_normalize_factors = os.path.join(predata_dir, 'nf.p')
@@ -53,7 +54,6 @@ class DGADataset(Dataset):
 
     def __getitem__(self, i):
         mondict = self.load_seq(i)
-        ts = mondict['ts']
         us = mondict['us']
         dxi_ij = mondict['dxi_ij']
         gt_interpolated = mondict['gt_interpolated']
@@ -75,7 +75,8 @@ class DGADataset(Dataset):
         us = us[n0: nend]
         dxi_ij = dxi_ij[n0: nend]
         delta_v_gt = delta_v_gt[n0: nend]
-        return us, dxi_ij, delta_v_gt
+        gt_interpolated = gt_interpolated[n0: nend]
+        return us, dxi_ij, delta_v_gt, gt_interpolated
 
     def __len__(self):
         return len(self.seq_dict[self.mode])
