@@ -1,3 +1,4 @@
+from asyncore import loop
 import sys
 sys.path.append('/root/denoise')
 
@@ -62,9 +63,10 @@ class LearningProcess:
         cprint('Preprocess ... ', 'green')
         all_seqs = [*self.params['dataset']['train_seqs'], *self.params['dataset']['test_seqs']]
         all_seqs.sort()
+        v_window = self.params['train']['loss']['v_window']
 
         for seq in all_seqs:
-            _file_path = os.path.join(self.params['dataset']['predata_dir'], '%s.p'%seq)
+            _file_path = os.path.join(self.params['dataset']['predata_dir'], '%s_v%d.p'%(seq, v_window))
             if os.path.exists(_file_path):
                 print('  %s is already pre-processed.' % seq)
                 continue
@@ -141,6 +143,22 @@ class LearningProcess:
 
             delta_v_gt = v_gt[:-mtf] - v_gt[mtf:]
 
+            ### Compute 511 size window normalized velocity
+            padding_size = 510
+            N = v_gt.shape[0]
+            _vs_gt = torch.cat([v_gt[0, :].unsqueeze(0).expand(padding_size, 3), v_gt], dim=0) # torch.Size([batch_size, 16510, 3])
+            _vs_gt_norm = []
+            for i in range(N):
+                window_batch = _vs_gt[i:i+padding_size+1] # torch.Size([6, 511, 3])
+                _std, _mean = torch.std_mean(window_batch, unbiased=False, dim=0)
+                _normalized = (window_batch[-1, :] - _mean)           # torch.Size([6, 3]) # 220414 평균만 제거 하는 쪽으로 선회
+                _normalized = _normalized.unsqueeze(0)                # torch.Size([6, 1, 3])
+                if i == 0:
+                    _vs_gt_norm.append(torch.zeros_like(_normalized))
+                else:
+                    _vs_gt_norm.append(_normalized)
+            _vs_gt_norm = torch.cat(_vs_gt_norm, dim=0) # torch.Size([6, 16000, 3])
+
             # save for all training
             mondict = {
                 'ts': imu[:, 0].float(),
@@ -148,6 +166,7 @@ class LearningProcess:
                 'dxi_ij': dxi_ij.float(),
                 'gt_interpolated': gt_interpolated.float(),
                 'delta_v_gt': delta_v_gt.float(),
+                'vs_gt_norm': _vs_gt_norm.float(),
             }
 
             for key, value in mondict.items():
@@ -197,6 +216,7 @@ class LearningProcess:
         # Training Loop
         loss, best_loss = torch.Tensor([0.0]), torch.Tensor([10000.0])
         for epoch in range(1, n_epochs + 1):
+            print('Epoch %d' % epoch)
             loss_epoch = self.loop_train(dataloader, optimizer, criterion)
             writer.add_scalar('loss/train', loss_epoch.item(), epoch)
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
@@ -265,7 +285,7 @@ class LearningProcess:
             if not os.path.exists(os.path.join(self.params['result_dir'], seq)):
                 os.mkdir(os.path.join(self.params['result_dir'], seq))
             cprint('On %s ... ' % seq, 'green', end='')
-            us, dxi_ij, delta_v_gt, gt_interpolated = dataset_test[i]
+            us, dxi_ij, delta_v_gt, gt_interpolated, vs_gt_norm = dataset_test[i]
             # print('  us: ', us.shape)
             # print('  dxi_ij: ', dxi_ij.shape)
             # print('  delta_v_gt: ', delta_v_gt.shape)
@@ -320,14 +340,14 @@ class LearningProcess:
         """Forward-backward loop over training data"""
         loss_epoch = 0
         optimizer.zero_grad()
-        for us, xs, dv, gt in dataloader:
-            us = dataloader.dataset.add_noise(us.cuda())
+        for us, xs, dv, gt, vs_gt_norm in dataloader:
+            us = dataloader.dataset.add_noise(us.cuda()) # torch.Size([6, 16000, 6])
             q_gt = gt[:, :, 4:8].reshape(-1, 4)
             rot_gt = SO3.from_quaternion(q_gt.cuda())
             rot_gt = rot_gt.reshape(us.shape[0], us.shape[1], 3, 3)
 
             w_hat, a_hat = self.net(us, rot_gt)
-            loss = criterion(w_hat, a_hat, xs.cuda(), dv.cuda())/len(dataloader)
+            loss = criterion(w_hat, a_hat, xs.cuda(), dv.cuda(), vs_gt_norm.cuda())/len(dataloader)
             loss.backward()
             loss_epoch += loss.detach().cpu()
         optimizer.step()
@@ -339,13 +359,13 @@ class LearningProcess:
         self.net.eval()
         with torch.no_grad():
             for i in range(len(dataset)):
-                us, xs, dv, gt = dataset[i]
+                us, xs, dv, gt, vs_gt_norm = dataset[i]
                 q_gt = gt[:, 4:8]
                 rot_gt = SO3.from_quaternion(q_gt.cuda())
                 rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
 
                 w_hat, a_hat = self.net(us.cuda().unsqueeze(0), rot_gt.cuda().unsqueeze(0), 'val')
-                loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0), 'val')/len(dataset)
+                loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0), vs_gt_norm.cuda().unsqueeze(0), 'val')/len(dataset)
                 loss_epoch += loss.cpu()
         self.net.train()
         return loss_epoch
@@ -356,7 +376,7 @@ class LearningProcess:
 
         for i in range(len(dataset)):
             seq = dataset.sequences[i]
-            us, xs, dv, gt = dataset[i]
+            us, xs, dv, gt, vs_gt_norm = dataset[i]
             q_gt = gt[:, 4:8]
             rot_gt = SO3.from_quaternion(q_gt.cuda())
             rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
@@ -367,7 +387,7 @@ class LearningProcess:
 
             with torch.no_grad():
                 w_hat, a_hat = self.net(us.cuda().unsqueeze(0), rot_gt.cuda().unsqueeze(0))
-                loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0))
+                loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0), vs_gt_norm.cuda().unsqueeze(0))
                 self.dict_test_result[seq] = {
                     'w_hat': w_hat[0].cpu(),
                     'a_hat': a_hat[0].cpu(),
@@ -437,8 +457,8 @@ class LearningProcess:
                 return x * (180. / np.pi)
 
             quat_hat, rot_imu, rot_hat = self.integrate_with_quaternions_superfast(N, us, w_hat)
-            imu_rpys = 180/np.pi*SO3.to_rpy(rot_imu).cpu()
-            net_rpys = 180/np.pi*SO3.to_rpy(rot_hat).cpu()
+            imu_rpys = (180/np.pi)*SO3.to_rpy(rot_imu).cpu()
+            net_rpys = (180/np.pi)*SO3.to_rpy(rot_hat).cpu()
 
             self.plot_orientation(imu_rpys, net_rpys, N)
             self.plot_orientation_error(rot_imu, rot_hat, N)
@@ -573,8 +593,8 @@ class LearningProcess:
         net_us = self.w_hat[:, :3]
 
         net_qs, imu_Rots, net_Rots = self.integrate_with_quaternions_superfast(N, raw_us, net_us)
-        imu_rpys = 180/np.pi*SO3.to_rpy(imu_Rots).cpu()
-        net_rpys = 180/np.pi*SO3.to_rpy(net_Rots).cpu()
+        imu_rpys = (180/np.pi)*SO3.to_rpy(imu_Rots).cpu()
+        net_rpys = (180/np.pi)*SO3.to_rpy(net_Rots).cpu()
         self.plot_orientation(imu_rpys, net_rpys, N)
         self.plot_orientation_error(imu_Rots, net_Rots, N)
 
@@ -645,7 +665,7 @@ class LearningProcess:
         axs[2].set(xlabel='$t$ (min)', ylabel='yaw (deg)')
 
         for i in range(3):
-            axs[i].plot(self.ts, rpy_imu[:, i]%360, color='red', label=r'raw IMU')
+            # axs[i].plot(self.ts, rpy_imu[:, i]%360, color='red', label=r'raw IMU')
             axs[i].plot(self.ts, rpy_hat[:, i]%360, color='blue', label=r'net IMU')
             axs[i].plot(self.ts, rpy_gt[:, i]%360, color='black', label=r'ground truth')
             axs[i].set_xlim(self.ts[0], self.ts[-1])
@@ -655,8 +675,8 @@ class LearningProcess:
 
     def plot_orientation_error(self, N, rot_imu, rot_hat, rot_gt):
         rot_gt = rot_gt[:N].cuda()
-        err_imu = 180/np.pi*SO3.log(bmtm(rot_imu, rot_gt)).cpu()
-        err_hat = 180/np.pi*SO3.log(bmtm(rot_hat, rot_gt)).cpu()
+        err_imu = (180/np.pi)*SO3.log(bmtm(rot_imu, rot_gt)).cpu()
+        err_hat = (180/np.pi)*SO3.log(bmtm(rot_hat, rot_gt)).cpu()
         title = "$SO(3)$ orientation error"
         fig, axs = plt.subplots(3, 1, sharex=True, figsize=self.figsize)
         axs[0].set(ylabel='roll (deg)', title=title)

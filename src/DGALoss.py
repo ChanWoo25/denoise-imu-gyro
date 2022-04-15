@@ -79,6 +79,7 @@ class DGALoss(torch.nn.Module):
             dv_hat = dv_hat[::2] + dv_hat[1::2]
             dv = dv[::2] + dv[1::2]
             acc_loss_32 = ((dv - dv_hat)**2).sum() * _scale
+
         ###
         # print("Gyro Loss16:", gyro_loss_16.item())
         # print("Gyro Loss32:", gyro_loss_32.item())
@@ -90,7 +91,9 @@ class DGALoss(torch.nn.Module):
             ratio /= ratio.sum()
             ratio *= 100.0
             print("Loss  :: (%.2f, %.2f, %.2f, %.2f)" % (gyro_loss_16.item(), gyro_loss_32.item(), acc_loss_16.item(), acc_loss_16.item()))
-            print("Ratio :: (%.2f%:%.2f%:%.2f%:%.2f%)" % (ratio[0], ratio[1], ratio[2], ratio[3]))
+            print("Ratio :: (%.2f:%.2f:%.2f:%.2f)" % (ratio[0], ratio[1], ratio[2], ratio[3]))
+
+
 
         """ -- Training --
             DGA Loss :: forward() :: Debugging

@@ -19,7 +19,7 @@ import sys
 class DGADataset(Dataset):
 
     def __init__(self, train_seqs, val_seqs, test_seqs, data_dir, predata_dir, \
-            N, min_train_freq, max_train_freq, mode):
+            N, min_train_freq, max_train_freq, v_window, mode):
 
         super().__init__()
 
@@ -34,6 +34,7 @@ class DGADataset(Dataset):
         self.N = N
         self.min_train_freq = min_train_freq
         self.max_train_freq = max_train_freq
+        self.v_window = v_window
         self.mode = mode
         self.sequences = self.seq_dict[mode]
         self.dt = 0.05
@@ -58,6 +59,7 @@ class DGADataset(Dataset):
         dxi_ij = mondict['dxi_ij']
         gt_interpolated = mondict['gt_interpolated']
         delta_v_gt = mondict['delta_v_gt']
+        vs_gt_norm = mondict['vs_gt_norm']
 
 
         N_max = dxi_ij.shape[0]
@@ -76,7 +78,8 @@ class DGADataset(Dataset):
         dxi_ij = dxi_ij[n0: nend]
         delta_v_gt = delta_v_gt[n0: nend]
         gt_interpolated = gt_interpolated[n0: nend]
-        return us, dxi_ij, delta_v_gt, gt_interpolated
+        vs_gt_norm = vs_gt_norm[n0: nend]
+        return us, dxi_ij, delta_v_gt, gt_interpolated, vs_gt_norm
 
     def __len__(self):
         return len(self.seq_dict[self.mode])
@@ -103,7 +106,7 @@ class DGADataset(Dataset):
         self._val = True
 
     def load_seq(self, i):
-        return pload(self.predata_dir, self.seq_dict[self.mode][i] + '.p')
+        return pload(self.predata_dir, self.seq_dict[self.mode][i] + '_v%d.p'%self.v_window)
 
     def init_normalize_factors(self, seqs):
         if os.path.exists(self.path_normalize_factors):
@@ -125,7 +128,7 @@ class DGADataset(Dataset):
         n_neg = 0
 
         for i, seq in enumerate(seqs):
-            pickle_dict = pload(self.predata_dir, seq + '.p')
+            pickle_dict = pload(self.predata_dir, seq + '_v%d.p'%self.v_window)
             us = pickle_dict['us']
             sms = pickle_dict['dxi_ij']
 
@@ -145,7 +148,7 @@ class DGADataset(Dataset):
 
         # second compute standard deviation
         for i, seq in enumerate(seqs):
-            pickle_dict = pload(self.predata_dir, seq + '.p')
+            pickle_dict = pload(self.predata_dir, seq + '_v%d.p'%self.v_window)
             us = pickle_dict['us']
             if i == 0:
                 std_u = ((us - mean_seqs) ** 2).sum(dim=0)

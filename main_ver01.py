@@ -1,10 +1,11 @@
+from email.policy import default
 import os
 import numpy as np
 import torch
 
 from src.DGAProcess import LearningProcess
 
-from src.DGALoss import DGALoss
+from src.DGALossV2 import DGALoss
 from src.DGANet import DGANet
 from src.DGANetV2 import DGANetV2
 
@@ -17,6 +18,7 @@ parser.add_argument('--mode', type=str, default='train')
 parser.add_argument('--id', type=str, default=None)
 parser.add_argument('-c', type=int, default=-1)
 parser.add_argument('--lr', type=float, default=-1.0)
+parser.add_argument('--v_windows', nargs='+', type=int, default=[64])
 args = parser.parse_args()
 print(args.__dict__)
 
@@ -53,6 +55,7 @@ params = {
         'N': 32 * 500, # should be integer * 'max_train_freq'
         'min_train_freq': 16,
         'max_train_freq': 32,
+        'v_window': 16,
     },
 
     'net_class': DGANet,
@@ -82,6 +85,7 @@ params = {
             'w':  1e6,
             'huber': 0.005,
             'dt': 0.005,
+            'v_window': 16,
         },
         'scheduler_class': torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
         'scheduler': {
@@ -90,16 +94,16 @@ params = {
             'eta_min': 1e-3,
         },
         'dataloader': {
-            'batch_size': 10,
+            'batch_size': 6,
             'pin_memory': False,
             'num_workers': 0,
             'shuffle': False,
         },
 
         # frequency of validation step
-        'freq_val': 200,
+        'freq_val': 20,
         # total number of epochs
-        'n_epochs': 6000,
+        'n_epochs': 400,
     }
 }
 
@@ -116,17 +120,17 @@ params = {
 #     'acc_std': [2.0e-3, 2.0e-3, 2.0e-3],
 # }
 
-params['net']['c0'] = 32 # 220407_loss_l2_0
-# params['net']['c0'] = 64
-
 if __name__ == '__main__':
-    if args.c is not -1:
+    if args.c >= 0:
         params['net']['c0'] = args.c
         cprint('Note :: params/net/c0 = %d' % args.c, 'green')
     if args.lr >= 0:
         params['train']['optimizer']['lr'] = args.lr
         cprint('Note :: params/train/optimizer/lr = %d' % args.lr, 'green')
-
+    if args.v_windows != [64]:
+        params['train']['loss']['v_windows'] = args.v_windows
+        params['dataset']['v_windows'] = args.v_windows
+        cprint('Note :: params/train/loss/v_window = %d' % args.v_windows, 'green')
 
     process = LearningProcess(params, args.mode)
 

@@ -4,7 +4,7 @@ if sys.platform.startswith('win'):
 elif sys.platform.startswith('linux'):
     sys.path.append('/root/denoise')
 
-from src.utils import pdump, pload, bmtv, bmtm
+from src.utils import pdump, , bmtv, bmtm
 from src.lie_algebra import SO3
 from termcolor import cprint
 from torch.utils.data.dataset import Dataset
@@ -102,14 +102,14 @@ class BaseDataset(Dataset):
         return self._length
 
     def load_seq(self, i):
-        return pload(self.predata_dir, self.sequences[i] + '.p')
+        return (self.predata_dir, self.sequences[i] + '.p')
 
     def load_gt(self, i):
-        return pload(self.predata_dir, self.sequences[i] + '_gt.p')
+        return (self.predata_dir, self.sequences[i] + '_gt.p')
 
     def init_normalize_factors(self, train_seqs):
         if os.path.exists(self.path_normalize_factors):
-            mondict = pload(self.path_normalize_factors)
+            mondict = (self.path_normalize_factors)
             return mondict['mean_u'], mondict['std_u']
 
         path = os.path.join(self.predata_dir, train_seqs[0] + '.p')
@@ -123,7 +123,7 @@ class BaseDataset(Dataset):
         num_data = 0
 
         for i, sequence in enumerate(train_seqs):
-            pickle_dict = pload(self.predata_dir, sequence + '.p')
+            pickle_dict = (self.predata_dir, sequence + '.p')
             us = pickle_dict['us']
             sms = pickle_dict['xs']
             if i == 0:
@@ -140,7 +140,7 @@ class BaseDataset(Dataset):
 
         # second compute standard deviation
         for i, sequence in enumerate(train_seqs):
-            pickle_dict = pload(self.predata_dir, sequence + '.p')
+            pickle_dict = (self.predata_dir, sequence + '.p')
             us = pickle_dict['us']
             if i == 0:
                 std_u = ((us - mean_u) ** 2).sum(dim=0)

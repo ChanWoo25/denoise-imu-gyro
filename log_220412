@@ -1,0 +1,1467 @@
+{'lr': -1.0, 'id': '220412_c32_0', 'mode': 'train', 'c': 32}
+[32mNote :: params/net/c0 = 32[0m
+[32mPreprocess ... [0m
+  MH_01_easy is already pre-processed.
+  MH_02_easy is already pre-processed.
+  MH_03_medium is already pre-processed.
+  MH_04_difficult is already pre-processed.
+  MH_05_difficult is already pre-processed.
+  V1_01_easy is already pre-processed.
+  V1_02_medium is already pre-processed.
+  V1_03_difficult is already pre-processed.
+  V2_01_easy is already pre-processed.
+  V2_02_medium is already pre-processed.
+  V2_03_difficult is already pre-processed.
+  -- success --
+
+[32mInitilaize DGANet ...[0m
+  It's a DNN Model for denoising IMU sensor's raw measurements (both gryo & accel)
+  -- success --
+
+[1m[36m
+========== Train ==========
+[0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[30mEpoch   40 Loss(train) 608.6520[0m
+[30mEpoch   80 Loss(train) 536.7185[0m
+[30mEpoch  120 Loss(train) 424.3050[0m
+[30mEpoch  160 Loss(train) 307.5455[0m
+Loss  :: (0.26, 0.49, 4.26, 4.26)
+Ratio :: (2.80:5.26:45.97:45.97)
+Loss  :: (0.41, 0.62, 2.07, 2.07)
+Ratio :: (7.97:11.96:40.03:40.03)
+Loss  :: (1.12, 1.91, 12.30, 12.30)
+Ratio :: (4.04:6.91:44.53:44.53)
+Loss  :: (0.99, 1.60, 7.43, 7.43)
+Ratio :: (5.65:9.17:42.59:42.59)
+Loss  :: (0.28, 0.52, 3.97, 3.97)
+Ratio :: (3.25:5.93:45.41:45.41)
+[34mEpoch  200 Loss(val) Decrease - 12.92s[0m
+  - current: 18.3737
+  - best   : 10000.0000
+[30mEpoch  240 Loss(train) 115.6308[0m
+[30mEpoch  280 Loss(train) 73.1199[0m
+[30mEpoch  320 Loss(train) 58.2447[0m
+[30mEpoch  360 Loss(train) 53.2560[0m
+Loss  :: (0.03, 0.04, 2.13, 2.13)
+Ratio :: (0.76:0.95:49.14:49.14)
+Loss  :: (0.07, 0.10, 1.31, 1.31)
+Ratio :: (2.66:3.55:46.90:46.90)
+Loss  :: (0.15, 0.23, 6.62, 6.62)
+Ratio :: (1.09:1.69:48.61:48.61)
+Loss  :: (0.12, 0.16, 4.12, 4.12)
+Ratio :: (1.36:1.89:48.38:48.38)
+Loss  :: (0.11, 0.18, 3.60, 3.60)
+Ratio :: (1.41:2.42:48.09:48.09)
+[34mEpoch  400 Loss(val) Decrease - 13.03s[0m
+  - current: 9.9746
+  - best   : 18.3737
+[30mEpoch  440 Loss(train) 48.3821[0m
+[30mEpoch  480 Loss(train) 47.8375[0m
+[30mEpoch  520 Loss(train) 47.2967[0m
+[30mEpoch  560 Loss(train) 46.4856[0m
+Loss  :: (0.03, 0.03, 2.06, 2.06)
+Ratio :: (0.63:0.71:49.33:49.33)
+Loss  :: (0.07, 0.09, 1.34, 1.34)
+Ratio :: (2.47:3.23:47.15:47.15)
+Loss  :: (0.15, 0.22, 6.63, 6.63)
+Ratio :: (1.07:1.63:48.65:48.65)
+Loss  :: (0.10, 0.14, 3.87, 3.87)
+Ratio :: (1.30:1.72:48.49:48.49)
+Loss  :: (0.09, 0.16, 3.59, 3.59)
+Ratio :: (1.26:2.13:48.30:48.30)
+[34mEpoch  600 Loss(val) Decrease - 12.97s[0m
+  - current: 9.7940
+  - best   : 9.9746
+[30mEpoch  640 Loss(train) 117.0059[0m
+[30mEpoch  680 Loss(train) 79.9429[0m
+[30mEpoch  720 Loss(train) 65.2559[0m
+[30mEpoch  760 Loss(train) 61.5167[0m
+Loss  :: (0.04, 0.05, 3.11, 3.11)
+Ratio :: (0.56:0.74:49.35:49.35)
+Loss  :: (0.07, 0.09, 1.31, 1.31)
+Ratio :: (2.57:3.31:47.06:47.06)
+Loss  :: (0.17, 0.28, 7.79, 7.79)
+Ratio :: (1.08:1.77:48.58:48.58)
+Loss  :: (0.12, 0.17, 4.50, 4.50)
+Ratio :: (1.31:1.86:48.42:48.42)
+Loss  :: (0.10, 0.17, 3.67, 3.67)
+Ratio :: (1.33:2.28:48.19:48.19)
+[33mEpoch  800 Loss(val) Increase - 12.91s[0m
+  - current: 11.5335
+  - best   : 9.7940
+[30mEpoch  840 Loss(train) 53.9006[0m
+[30mEpoch  880 Loss(train) 51.8828[0m
+[30mEpoch  920 Loss(train) 51.5534[0m
+[30mEpoch  960 Loss(train) 51.3552[0m
+Loss  :: (0.03, 0.03, 2.69, 2.69)
+Ratio :: (0.50:0.56:49.47:49.47)
+Loss  :: (0.05, 0.07, 1.56, 1.56)
+Ratio :: (1.69:2.14:48.08:48.08)
+Loss  :: (0.14, 0.22, 7.11, 7.11)
+Ratio :: (0.98:1.54:48.74:48.74)
+Loss  :: (0.10, 0.12, 4.00, 4.00)
+Ratio :: (1.19:1.48:48.67:48.67)
+Loss  :: (0.10, 0.17, 3.59, 3.59)
+Ratio :: (1.36:2.32:48.16:48.16)
+[33mEpoch 1000 Loss(val) Increase - 12.87s[0m
+  - current: 10.6496
+  - best   : 9.7940
+[30mEpoch 1040 Loss(train) 48.5100[0m
+[30mEpoch 1080 Loss(train) 48.7078[0m
+[30mEpoch 1120 Loss(train) 48.7137[0m
+[30mEpoch 1160 Loss(train) 47.2846[0m
+Loss  :: (0.03, 0.03, 2.26, 2.26)
+Ratio :: (0.61:0.70:49.34:49.34)
+Loss  :: (0.06, 0.08, 1.53, 1.53)
+Ratio :: (1.88:2.36:47.88:47.88)
+Loss  :: (0.13, 0.19, 7.96, 7.96)
+Ratio :: (0.80:1.18:49.01:49.01)
+Loss  :: (0.10, 0.13, 4.34, 4.34)
+Ratio :: (1.14:1.46:48.70:48.70)
+Loss  :: (0.10, 0.18, 3.09, 3.09)
+Ratio :: (1.58:2.73:47.84:47.84)
+[33mEpoch 1200 Loss(val) Increase - 13.08s[0m
+  - current: 10.8277
+  - best   : 9.7940
+[30mEpoch 1240 Loss(train) 46.9740[0m
+[30mEpoch 1280 Loss(train) 45.8822[0m
+[30mEpoch 1320 Loss(train) 45.3761[0m
+[30mEpoch 1360 Loss(train) 45.0523[0m
+Loss  :: (0.03, 0.03, 2.21, 2.21)
+Ratio :: (0.58:0.64:49.39:49.39)
+Loss  :: (0.06, 0.07, 1.52, 1.52)
+Ratio :: (1.81:2.27:47.96:47.96)
+Loss  :: (0.14, 0.22, 7.74, 7.74)
+Ratio :: (0.91:1.41:48.84:48.84)
+Loss  :: (0.10, 0.12, 4.29, 4.29)
+Ratio :: (1.10:1.37:48.76:48.76)
+Loss  :: (0.10, 0.18, 3.02, 3.02)
+Ratio :: (1.63:2.80:47.79:47.79)
+[33mEpoch 1400 Loss(val) Increase - 12.93s[0m
+  - current: 10.5719
+  - best   : 9.7940
+[30mEpoch 1440 Loss(train) 44.9875[0m
+[30mEpoch 1480 Loss(train) 44.4917[0m
+[30mEpoch 1520 Loss(train) 44.2595[0m
+[30mEpoch 1560 Loss(train) 43.8390[0m
+Loss  :: (0.03, 0.03, 2.07, 2.07)
+Ratio :: (0.62:0.69:49.34:49.34)
+Loss  :: (0.06, 0.07, 1.66, 1.66)
+Ratio :: (1.69:2.15:48.08:48.08)
+Loss  :: (0.15, 0.24, 7.79, 7.79)
+Ratio :: (0.97:1.52:48.76:48.76)
+Loss  :: (0.10, 0.13, 4.19, 4.19)
+Ratio :: (1.16:1.48:48.68:48.68)
+Loss  :: (0.10, 0.17, 2.98, 2.98)
+Ratio :: (1.63:2.80:47.78:47.78)
+[33mEpoch 1600 Loss(val) Increase - 12.94s[0m
+  - current: 10.5181
+  - best   : 9.7940
+[30mEpoch 1640 Loss(train) 43.7747[0m
+[30mEpoch 1680 Loss(train) 43.3629[0m
+[30mEpoch 1720 Loss(train) 43.2728[0m
+[30mEpoch 1760 Loss(train) 43.1099[0m
+Loss  :: (0.03, 0.03, 2.20, 2.20)
+Ratio :: (0.62:0.72:49.33:49.33)
+Loss  :: (0.06, 0.08, 1.58, 1.58)
+Ratio :: (1.85:2.40:47.87:47.87)
+Loss  :: (0.15, 0.24, 7.74, 7.74)
+Ratio :: (0.97:1.52:48.75:48.75)
+Loss  :: (0.10, 0.12, 4.37, 4.37)
+Ratio :: (1.10:1.38:48.76:48.76)
+Loss  :: (0.11, 0.19, 3.18, 3.18)
+Ratio :: (1.61:2.79:47.80:47.80)
+[33mEpoch 1800 Loss(val) Increase - 12.79s[0m
+  - current: 10.7325
+  - best   : 9.7940
+[30mEpoch 1840 Loss(train) 139.1202[0m
+[30mEpoch 1880 Loss(train) 93.1472[0m
+[30mEpoch 1920 Loss(train) 76.6853[0m
+[30mEpoch 1960 Loss(train) 67.5033[0m
+Loss  :: (0.30, 0.56, 3.04, 3.04)
+Ratio :: (4.36:8.10:43.77:43.77)
+Loss  :: (0.58, 0.95, 1.59, 1.59)
+Ratio :: (12.29:20.19:33.76:33.76)
+Loss  :: (1.50, 2.50, 8.54, 8.54)
+Ratio :: (7.11:11.87:40.51:40.51)
+Loss  :: (1.17, 1.94, 4.71, 4.71)
+Ratio :: (9.32:15.49:37.60:37.60)
+Loss  :: (0.35, 0.64, 3.66, 3.66)
+Ratio :: (4.19:7.74:44.04:44.04)
+[33mEpoch 2000 Loss(val) Increase - 12.95s[0m
+  - current: 14.0331
+  - best   : 9.7940
+[30mEpoch 2040 Loss(train) 59.2589[0m
+[30mEpoch 2080 Loss(train) 58.2102[0m
+[30mEpoch 2120 Loss(train) 55.2960[0m
+[30mEpoch 2160 Loss(train) 54.6983[0m
+Loss  :: (0.18, 0.33, 2.78, 2.78)
+Ratio :: (3.04:5.41:45.77:45.77)
+Loss  :: (0.38, 0.62, 1.42, 1.42)
+Ratio :: (9.91:16.27:36.91:36.91)
+Loss  :: (0.72, 1.31, 7.55, 7.55)
+Ratio :: (4.23:7.64:44.07:44.07)
+Loss  :: (0.55, 0.99, 3.79, 3.79)
+Ratio :: (6.08:10.85:41.54:41.54)
+Loss  :: (0.21, 0.39, 3.10, 3.10)
+Ratio :: (3.15:5.77:45.54:45.54)
+[33mEpoch 2200 Loss(val) Increase - 13.06s[0m
+  - current: 11.4264
+  - best   : 9.7940
+[30mEpoch 2240 Loss(train) 53.1394[0m
+[30mEpoch 2280 Loss(train) 53.0853[0m
+[30mEpoch 2320 Loss(train) 55.5921[0m
+[30mEpoch 2360 Loss(train) 49.3124[0m
+Loss  :: (0.03, 0.03, 2.56, 2.56)
+Ratio :: (0.55:0.62:49.41:49.41)
+Loss  :: (0.07, 0.10, 1.47, 1.47)
+Ratio :: (2.29:3.21:47.25:47.25)
+Loss  :: (0.14, 0.23, 7.86, 7.86)
+Ratio :: (0.90:1.42:48.84:48.84)
+Loss  :: (0.13, 0.18, 3.99, 3.99)
+Ratio :: (1.51:2.19:48.15:48.15)
+Loss  :: (0.10, 0.17, 3.26, 3.26)
+Ratio :: (1.46:2.49:48.03:48.03)
+[33mEpoch 2400 Loss(val) Increase - 13.07s[0m
+  - current: 10.8182
+  - best   : 9.7940
+[30mEpoch 2440 Loss(train) 47.9493[0m
+[30mEpoch 2480 Loss(train) 46.7878[0m
+[30mEpoch 2520 Loss(train) 46.7562[0m
+[30mEpoch 2560 Loss(train) 50.0929[0m
+Loss  :: (0.03, 0.04, 2.63, 2.63)
+Ratio :: (0.55:0.66:49.39:49.39)
+Loss  :: (0.07, 0.09, 1.46, 1.46)
+Ratio :: (2.32:2.90:47.39:47.39)
+Loss  :: (0.13, 0.20, 8.31, 8.31)
+Ratio :: (0.77:1.18:49.03:49.03)
+Loss  :: (0.12, 0.17, 4.20, 4.20)
+Ratio :: (1.35:1.95:48.35:48.35)
+Loss  :: (0.11, 0.18, 3.01, 3.01)
+Ratio :: (1.68:2.91:47.70:47.70)
+[33mEpoch 2600 Loss(val) Increase - 13.09s[0m
+  - current: 11.0574
+  - best   : 9.7940
+[30mEpoch 2640 Loss(train) 48.4364[0m
+[30mEpoch 2680 Loss(train) 48.9665[0m
+[30mEpoch 2720 Loss(train) 46.7469[0m
+[30mEpoch 2760 Loss(train) 48.7588[0m
+Loss  :: (0.03, 0.04, 2.37, 2.37)
+Ratio :: (0.64:0.78:49.29:49.29)
+Loss  :: (0.08, 0.10, 1.54, 1.54)
+Ratio :: (2.42:2.94:47.32:47.32)
+Loss  :: (0.14, 0.22, 8.28, 8.28)
+Ratio :: (0.84:1.31:48.92:48.92)
+Loss  :: (0.11, 0.16, 3.74, 3.74)
+Ratio :: (1.47:2.10:48.21:48.21)
+Loss  :: (0.10, 0.18, 3.01, 3.01)
+Ratio :: (1.64:2.83:47.77:47.77)
+[33mEpoch 2800 Loss(val) Increase - 13.15s[0m
+  - current: 10.6841
+  - best   : 9.7940
+[30mEpoch 2840 Loss(train) 47.8853[0m
+[30mEpoch 2880 Loss(train) 46.2422[0m
+[30mEpoch 2920 Loss(train) 45.1371[0m
+[30mEpoch 2960 Loss(train) 45.9905[0m
+Loss  :: (0.03, 0.04, 2.33, 2.33)
+Ratio :: (0.63:0.74:49.31:49.31)
+Loss  :: (0.09, 0.11, 1.50, 1.50)
+Ratio :: (2.88:3.57:46.77:46.77)
+Loss  :: (0.16, 0.25, 8.67, 8.67)
+Ratio :: (0.90:1.41:48.85:48.85)
+Loss  :: (0.11, 0.16, 4.00, 4.00)
+Ratio :: (1.35:1.89:48.38:48.38)
+Loss  :: (0.10, 0.16, 2.94, 2.94)
+Ratio :: (1.56:2.65:47.89:47.89)
+[33mEpoch 3000 Loss(val) Increase - 13.15s[0m
+  - current: 11.0086
+  - best   : 9.7940
+[30mEpoch 3040 Loss(train) 45.5081[0m
+[30mEpoch 3080 Loss(train) 45.7358[0m
+[30mEpoch 3120 Loss(train) 45.3557[0m
+[30mEpoch 3160 Loss(train) 44.7748[0m
+Loss  :: (0.03, 0.03, 2.36, 2.36)
+Ratio :: (0.57:0.62:49.41:49.41)
+Loss  :: (0.07, 0.09, 1.51, 1.51)
+Ratio :: (2.06:2.72:47.61:47.61)
+Loss  :: (0.16, 0.24, 8.26, 8.26)
+Ratio :: (0.93:1.44:48.81:48.81)
+Loss  :: (0.11, 0.15, 3.62, 3.62)
+Ratio :: (1.45:1.96:48.29:48.29)
+Loss  :: (0.10, 0.17, 3.19, 3.19)
+Ratio :: (1.48:2.52:48.00:48.00)
+[33mEpoch 3200 Loss(val) Increase - 13.17s[0m
+  - current: 10.6913
+  - best   : 9.7940
+[30mEpoch 3240 Loss(train) 44.8921[0m
+[30mEpoch 3280 Loss(train) 45.3174[0m
+[30mEpoch 3320 Loss(train) 43.8860[0m
+[30mEpoch 3360 Loss(train) 44.4566[0m
+Loss  :: (0.03, 0.03, 2.30, 2.30)
+Ratio :: (0.63:0.74:49.31:49.31)
+Loss  :: (0.08, 0.10, 1.54, 1.54)
+Ratio :: (2.33:3.02:47.32:47.32)
+Loss  :: (0.15, 0.23, 8.37, 8.37)
+Ratio :: (0.88:1.37:48.88:48.88)
+Loss  :: (0.09, 0.12, 4.04, 4.04)
+Ratio :: (1.11:1.42:48.73:48.73)
+Loss  :: (0.10, 0.18, 3.26, 3.26)
+Ratio :: (1.52:2.62:47.93:47.93)
+[33mEpoch 3400 Loss(val) Increase - 13.07s[0m
+  - current: 10.9967
+  - best   : 9.7940
+[30mEpoch 3440 Loss(train) 43.7101[0m
+[30mEpoch 3480 Loss(train) 44.2422[0m
+[30mEpoch 3520 Loss(train) 43.9761[0m
+[30mEpoch 3560 Loss(train) 44.1169[0m
+Loss  :: (0.03, 0.03, 2.42, 2.42)
+Ratio :: (0.58:0.66:49.38:49.38)
+Loss  :: (0.07, 0.09, 1.55, 1.55)
+Ratio :: (2.08:2.77:47.57:47.57)
+Loss  :: (0.15, 0.24, 8.46, 8.46)
+Ratio :: (0.88:1.36:48.88:48.88)
+Loss  :: (0.09, 0.12, 4.00, 4.00)
+Ratio :: (1.11:1.44:48.72:48.72)
+Loss  :: (0.11, 0.19, 3.08, 3.08)
+Ratio :: (1.70:2.96:47.67:47.67)
+[33mEpoch 3600 Loss(val) Increase - 12.92s[0m
+  - current: 10.9906
+  - best   : 9.7940
+[30mEpoch 3640 Loss(train) 43.2892[0m
+[30mEpoch 3680 Loss(train) 43.1918[0m
+[30mEpoch 3720 Loss(train) 43.0605[0m
+[30mEpoch 3760 Loss(train) 43.1252[0m
+Loss  :: (0.03, 0.03, 2.31, 2.31)
+Ratio :: (0.58:0.65:49.39:49.39)
+Loss  :: (0.06, 0.08, 1.50, 1.50)
+Ratio :: (2.06:2.59:47.68:47.68)
+Loss  :: (0.15, 0.24, 8.22, 8.22)
+Ratio :: (0.92:1.42:48.83:48.83)
+Loss  :: (0.09, 0.12, 3.75, 3.75)
+Ratio :: (1.21:1.61:48.59:48.59)
+Loss  :: (0.10, 0.17, 3.03, 3.03)
+Ratio :: (1.57:2.69:47.87:47.87)
+[33mEpoch 3800 Loss(val) Increase - 12.97s[0m
+  - current: 10.5653
+  - best   : 9.7940
+[30mEpoch 3840 Loss(train) 42.7736[0m
+[30mEpoch 3880 Loss(train) 42.5319[0m
+[30mEpoch 3920 Loss(train) 42.9371[0m
+[30mEpoch 3960 Loss(train) 42.6598[0m
+Loss  :: (0.03, 0.03, 2.33, 2.33)
+Ratio :: (0.55:0.58:49.44:49.44)
+Loss  :: (0.07, 0.08, 1.51, 1.51)
+Ratio :: (2.07:2.59:47.67:47.67)
+Loss  :: (0.16, 0.24, 8.34, 8.34)
+Ratio :: (0.92:1.43:48.83:48.83)
+Loss  :: (0.09, 0.12, 3.89, 3.89)
+Ratio :: (1.14:1.50:48.68:48.68)
+Loss  :: (0.10, 0.16, 3.11, 3.11)
+Ratio :: (1.49:2.53:47.99:47.99)
+[33mEpoch 4000 Loss(val) Increase - 12.97s[0m
+  - current: 10.7718
+  - best   : 9.7940
+[1m[36m
+  Train is over  
+[0m
+[32mTesting ... [0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+Loss  :: (0.03, 0.04, 6.32, 6.32)
+Ratio :: (0.22:0.28:49.75:49.75)
+Loss  :: (0.05, 0.06, 5.64, 5.64)
+Ratio :: (0.43:0.54:49.51:49.51)
+Loss  :: (0.12, 0.19, 20.10, 20.10)
+Ratio :: (0.31:0.47:49.61:49.61)
+Loss  :: (0.13, 0.20, 26.74, 26.74)
+Ratio :: (0.25:0.36:49.69:49.69)
+Loss  :: (0.10, 0.17, 6.69, 6.69)
+Ratio :: (0.74:1.24:49.01:49.01)
+  final_loss/val:  9.79401647535741
+  final_loss/test:  37.36333177583596
+{'id': '220412_c32_0', 'lr': -1.0, 'mode': 'test', 'c': 32}
+[32mNote :: params/net/c0 = 32[0m
+[32mPreprocess ... [0m
+  MH_01_easy is already pre-processed.
+  MH_02_easy is already pre-processed.
+  MH_03_medium is already pre-processed.
+  MH_04_difficult is already pre-processed.
+  MH_05_difficult is already pre-processed.
+  V1_01_easy is already pre-processed.
+  V1_02_medium is already pre-processed.
+  V1_03_difficult is already pre-processed.
+  V2_01_easy is already pre-processed.
+  V2_02_medium is already pre-processed.
+  V2_03_difficult is already pre-processed.
+  -- success --
+
+[32mInitilaize DGANet ...[0m
+  It's a DNN Model for denoising IMU sensor's raw measurements (both gryo & accel)
+  -- success --
+
+[1m[36m
+========== Test ==========
+[0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[32mTest ... [0m
+  - MH_02_easy      a_hat: <class 'torch.Tensor'> torch.Size([29952, 3]) torch.float32
+    w_hat: <class 'torch.Tensor'> torch.Size([29952, 3]) torch.float32
+[ok]
+  - MH_04_difficult      a_hat: <class 'torch.Tensor'> torch.Size([19712, 3]) torch.float32
+    w_hat: <class 'torch.Tensor'> torch.Size([19712, 3]) torch.float32
+[ok]
+  - V2_02_medium      a_hat: <class 'torch.Tensor'> torch.Size([23072, 3]) torch.float32
+    w_hat: <class 'torch.Tensor'> torch.Size([23072, 3]) torch.float32
+[ok]
+  - V1_03_difficult      a_hat: <class 'torch.Tensor'> torch.Size([20896, 3]) torch.float32
+    w_hat: <class 'torch.Tensor'> torch.Size([20896, 3]) torch.float32
+[ok]
+  - V1_01_easy      a_hat: <class 'torch.Tensor'> torch.Size([28672, 3]) torch.float32
+    w_hat: <class 'torch.Tensor'> torch.Size([28672, 3]) torch.float32
+[ok]
+  --success
+{'lr': -1.0, 'mode': 'anal', 'id': '220412_c32_0', 'c': 32}
+[32mNote :: params/net/c0 = 32[0m
+[32mPreprocess ... [0m
+  MH_01_easy is already pre-processed.
+  MH_02_easy is already pre-processed.
+  MH_03_medium is already pre-processed.
+  MH_04_difficult is already pre-processed.
+  MH_05_difficult is already pre-processed.
+  V1_01_easy is already pre-processed.
+  V1_02_medium is already pre-processed.
+  V1_03_difficult is already pre-processed.
+  V2_01_easy is already pre-processed.
+  V2_02_medium is already pre-processed.
+  V2_03_difficult is already pre-processed.
+  -- success --
+
+[33m  No need to initialize a model[0m
+[1m[36m
+========== Analysis ==========
+[0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[32mOn MH_02_easy ... [0m[34m[ok]
+[0m
+[32mOn MH_04_difficult ... [0m[34m[ok]
+[0m
+[32mOn V2_02_medium ... [0m[34m[ok]
+[0m
+[32mOn V1_03_difficult ... [0m[34m[ok]
+[0m
+[32mOn V1_01_easy ... [0m[34m[ok]
+[0m
+{'id': '220412_c32_1', 'c': 32, 'mode': 'train', 'lr': -1.0}
+[32mNote :: params/net/c0 = 32[0m
+[32mPreprocess ... [0m
+  MH_01_easy is already pre-processed.
+  MH_02_easy is already pre-processed.
+  MH_03_medium is already pre-processed.
+  MH_04_difficult is already pre-processed.
+  MH_05_difficult is already pre-processed.
+  V1_01_easy is already pre-processed.
+  V1_02_medium is already pre-processed.
+  V1_03_difficult is already pre-processed.
+  V2_01_easy is already pre-processed.
+  V2_02_medium is already pre-processed.
+  V2_03_difficult is already pre-processed.
+  -- success --
+
+[32mInitilaize DGANet ...[0m
+  It's a DNN Model for denoising IMU sensor's raw measurements (both gryo & accel)
+  -- success --
+
+[1m[36m
+========== Train ==========
+[0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[30mEpoch   40 Loss(train) 613.0998[0m
+[30mEpoch   80 Loss(train) 553.6915[0m
+[30mEpoch  120 Loss(train) 409.2031[0m
+[30mEpoch  160 Loss(train) 276.9977[0m
+Loss  :: (0.05, 0.07, 3.09, 3.09)
+Ratio :: (0.76:1.12:49.06:49.06)
+Loss  :: (0.08, 0.11, 1.74, 1.74)
+Ratio :: (2.24:3.01:47.37:47.37)
+Loss  :: (0.27, 0.44, 11.42, 11.42)
+Ratio :: (1.14:1.86:48.50:48.50)
+Loss  :: (0.18, 0.28, 5.81, 5.81)
+Ratio :: (1.48:2.30:48.11:48.11)
+Loss  :: (0.10, 0.18, 3.15, 3.15)
+Ratio :: (1.56:2.66:47.89:47.89)
+[34mEpoch  200 Loss(val) Decrease - 13.43s[0m
+  - current: 14.3477
+  - best   : 10000.0000
+[30mEpoch  240 Loss(train) 109.2209[0m
+[30mEpoch  280 Loss(train) 75.6990[0m
+[30mEpoch  320 Loss(train) 62.8735[0m
+[30mEpoch  360 Loss(train) 56.8386[0m
+Loss  :: (0.05, 0.08, 2.25, 2.25)
+Ratio :: (1.17:1.80:48.51:48.51)
+Loss  :: (0.09, 0.13, 1.30, 1.30)
+Ratio :: (3.15:4.63:46.11:46.11)
+Loss  :: (0.21, 0.33, 7.99, 7.99)
+Ratio :: (1.26:2.00:48.37:48.37)
+Loss  :: (0.17, 0.26, 4.46, 4.46)
+Ratio :: (1.82:2.73:47.72:47.72)
+Loss  :: (0.11, 0.19, 3.73, 3.73)
+Ratio :: (1.40:2.42:48.09:48.09)
+[34mEpoch  400 Loss(val) Decrease - 13.37s[0m
+  - current: 11.1996
+  - best   : 14.3477
+[30mEpoch  440 Loss(train) 51.1555[0m
+[30mEpoch  480 Loss(train) 49.4850[0m
+[30mEpoch  520 Loss(train) 48.7248[0m
+[30mEpoch  560 Loss(train) 47.8623[0m
+Loss  :: (0.03, 0.04, 2.14, 2.14)
+Ratio :: (0.76:0.95:49.15:49.15)
+Loss  :: (0.08, 0.10, 1.36, 1.36)
+Ratio :: (2.61:3.59:46.90:46.90)
+Loss  :: (0.18, 0.29, 7.82, 7.82)
+Ratio :: (1.14:1.79:48.53:48.53)
+Loss  :: (0.12, 0.16, 4.53, 4.53)
+Ratio :: (1.25:1.68:48.53:48.53)
+Loss  :: (0.10, 0.17, 3.58, 3.58)
+Ratio :: (1.36:2.32:48.16:48.16)
+[34mEpoch  600 Loss(val) Decrease - 12.95s[0m
+  - current: 10.9682
+  - best   : 11.1996
+[30mEpoch  640 Loss(train) 112.8454[0m
+[30mEpoch  680 Loss(train) 82.4043[0m
+[30mEpoch  720 Loss(train) 66.5826[0m
+[30mEpoch  760 Loss(train) 60.3108[0m
+Loss  :: (0.03, 0.04, 2.69, 2.69)
+Ratio :: (0.60:0.76:49.32:49.32)
+Loss  :: (0.08, 0.10, 1.61, 1.61)
+Ratio :: (2.43:3.03:47.27:47.27)
+Loss  :: (0.25, 0.41, 7.37, 7.37)
+Ratio :: (1.63:2.65:47.86:47.86)
+Loss  :: (0.15, 0.23, 4.61, 4.61)
+Ratio :: (1.60:2.36:48.02:48.02)
+Loss  :: (0.11, 0.18, 3.74, 3.74)
+Ratio :: (1.36:2.31:48.17:48.17)
+[33mEpoch  800 Loss(val) Increase - 12.99s[0m
+  - current: 11.3792
+  - best   : 10.9682
+[30mEpoch  840 Loss(train) 54.3682[0m
+[30mEpoch  880 Loss(train) 52.3766[0m
+[30mEpoch  920 Loss(train) 52.9010[0m
+[30mEpoch  960 Loss(train) 50.8663[0m
+Loss  :: (0.03, 0.03, 2.26, 2.26)
+Ratio :: (0.58:0.65:49.38:49.38)
+Loss  :: (0.06, 0.07, 1.38, 1.38)
+Ratio :: (1.96:2.40:47.82:47.82)
+Loss  :: (0.15, 0.24, 6.97, 6.97)
+Ratio :: (1.08:1.70:48.61:48.61)
+Loss  :: (0.08, 0.10, 4.37, 4.37)
+Ratio :: (0.95:1.11:48.97:48.97)
+Loss  :: (0.10, 0.17, 3.67, 3.67)
+Ratio :: (1.27:2.17:48.28:48.28)
+[34mEpoch 1000 Loss(val) Decrease - 13.02s[0m
+  - current: 10.5058
+  - best   : 10.9682
+[30mEpoch 1040 Loss(train) 49.5007[0m
+[30mEpoch 1080 Loss(train) 47.9970[0m
+[30mEpoch 1120 Loss(train) 48.1670[0m
+[30mEpoch 1160 Loss(train) 49.0578[0m
+Loss  :: (0.03, 0.03, 2.47, 2.47)
+Ratio :: (0.52:0.57:49.45:49.45)
+Loss  :: (0.07, 0.09, 1.60, 1.60)
+Ratio :: (2.04:2.70:47.63:47.63)
+Loss  :: (0.13, 0.20, 7.42, 7.42)
+Ratio :: (0.88:1.33:48.89:48.89)
+Loss  :: (0.08, 0.10, 4.75, 4.75)
+Ratio :: (0.86:1.05:49.04:49.04)
+Loss  :: (0.10, 0.17, 3.32, 3.32)
+Ratio :: (1.43:2.44:48.06:48.06)
+[33mEpoch 1200 Loss(val) Increase - 13.20s[0m
+  - current: 11.0122
+  - best   : 10.5058
+[30mEpoch 1240 Loss(train) 46.5293[0m
+[30mEpoch 1280 Loss(train) 46.4263[0m
+[30mEpoch 1320 Loss(train) 45.1525[0m
+[30mEpoch 1360 Loss(train) 45.7232[0m
+Loss  :: (0.03, 0.03, 2.29, 2.29)
+Ratio :: (0.62:0.71:49.34:49.34)
+Loss  :: (0.07, 0.09, 1.75, 1.75)
+Ratio :: (1.82:2.42:47.88:47.88)
+Loss  :: (0.16, 0.25, 7.34, 7.34)
+Ratio :: (1.08:1.69:48.62:48.62)
+Loss  :: (0.10, 0.14, 4.62, 4.62)
+Ratio :: (1.10:1.46:48.72:48.72)
+Loss  :: (0.10, 0.17, 3.45, 3.45)
+Ratio :: (1.37:2.34:48.15:48.15)
+[33mEpoch 1400 Loss(val) Increase - 13.11s[0m
+  - current: 10.9883
+  - best   : 10.5058
+[30mEpoch 1440 Loss(train) 44.6938[0m
+[30mEpoch 1480 Loss(train) 44.7340[0m
+[30mEpoch 1520 Loss(train) 44.4238[0m
+[30mEpoch 1560 Loss(train) 43.8730[0m
+Loss  :: (0.03, 0.04, 2.22, 2.22)
+Ratio :: (0.66:0.79:49.27:49.27)
+Loss  :: (0.08, 0.10, 1.93, 1.93)
+Ratio :: (1.90:2.56:47.77:47.77)
+Loss  :: (0.16, 0.24, 7.60, 7.60)
+Ratio :: (1.00:1.55:48.72:48.72)
+Loss  :: (0.09, 0.12, 4.65, 4.65)
+Ratio :: (0.98:1.23:48.90:48.90)
+Loss  :: (0.10, 0.17, 3.24, 3.24)
+Ratio :: (1.50:2.58:47.96:47.96)
+[33mEpoch 1600 Loss(val) Increase - 13.46s[0m
+  - current: 11.0844
+  - best   : 10.5058
+[30mEpoch 1640 Loss(train) 43.6752[0m
+[30mEpoch 1680 Loss(train) 43.7381[0m
+[30mEpoch 1720 Loss(train) 43.6941[0m
+[30mEpoch 1760 Loss(train) 43.5901[0m
+Loss  :: (0.03, 0.03, 2.17, 2.17)
+Ratio :: (0.64:0.74:49.31:49.31)
+Loss  :: (0.08, 0.10, 1.93, 1.93)
+Ratio :: (1.89:2.52:47.80:47.80)
+Loss  :: (0.16, 0.26, 7.60, 7.60)
+Ratio :: (1.05:1.64:48.66:48.66)
+Loss  :: (0.10, 0.13, 4.23, 4.23)
+Ratio :: (1.15:1.52:48.67:48.67)
+Loss  :: (0.10, 0.17, 3.29, 3.29)
+Ratio :: (1.45:2.48:48.03:48.03)
+[33mEpoch 1800 Loss(val) Increase - 13.23s[0m
+  - current: 10.8428
+  - best   : 10.5058
+[30mEpoch 1840 Loss(train) 141.9055[0m
+[30mEpoch 1880 Loss(train) 95.4779[0m
+[30mEpoch 1920 Loss(train) 78.0973[0m
+[30mEpoch 1960 Loss(train) 69.7802[0m
+Loss  :: (0.27, 0.48, 3.41, 3.41)
+Ratio :: (3.55:6.31:45.07:45.07)
+Loss  :: (0.42, 0.66, 1.74, 1.74)
+Ratio :: (9.12:14.44:38.22:38.22)
+Loss  :: (1.31, 2.22, 8.89, 8.89)
+Ratio :: (6.16:10.41:41.72:41.72)
+Loss  :: (1.08, 1.69, 4.24, 4.24)
+Ratio :: (9.63:14.98:37.69:37.69)
+Loss  :: (0.26, 0.47, 3.40, 3.40)
+Ratio :: (3.47:6.20:45.16:45.16)
+[33mEpoch 2000 Loss(val) Increase - 13.09s[0m
+  - current: 13.7950
+  - best   : 10.5058
+[30mEpoch 2040 Loss(train) 59.5900[0m
+[30mEpoch 2080 Loss(train) 56.8830[0m
+[30mEpoch 2120 Loss(train) 55.4089[0m
+[30mEpoch 2160 Loss(train) 54.3378[0m
+Loss  :: (0.11, 0.18, 2.38, 2.38)
+Ratio :: (2.10:3.66:47.12:47.12)
+Loss  :: (0.18, 0.29, 1.58, 1.58)
+Ratio :: (5.05:7.90:43.53:43.53)
+Loss  :: (0.61, 1.11, 7.93, 7.93)
+Ratio :: (3.46:6.33:45.11:45.11)
+Loss  :: (0.46, 0.82, 3.74, 3.74)
+Ratio :: (5.23:9.38:42.70:42.70)
+Loss  :: (0.15, 0.26, 3.27, 3.27)
+Ratio :: (2.13:3.71:47.08:47.08)
+[33mEpoch 2200 Loss(val) Increase - 13.07s[0m
+  - current: 11.2566
+  - best   : 10.5058
+[30mEpoch 2240 Loss(train) 52.9361[0m
+[30mEpoch 2280 Loss(train) 50.8301[0m
+[30mEpoch 2320 Loss(train) 54.9573[0m
+[30mEpoch 2360 Loss(train) 48.7917[0m
+Loss  :: (0.03, 0.03, 2.30, 2.30)
+Ratio :: (0.62:0.73:49.33:49.33)
+Loss  :: (0.10, 0.14, 1.35, 1.35)
+Ratio :: (3.53:4.83:45.82:45.82)
+Loss  :: (0.14, 0.21, 7.40, 7.40)
+Ratio :: (0.90:1.40:48.85:48.85)
+Loss  :: (0.09, 0.11, 4.11, 4.11)
+Ratio :: (1.07:1.32:48.80:48.80)
+Loss  :: (0.11, 0.19, 3.17, 3.17)
+Ratio :: (1.62:2.82:47.78:47.78)
+[34mEpoch 2400 Loss(val) Decrease - 13.04s[0m
+  - current: 10.3367
+  - best   : 10.5058
+[30mEpoch 2440 Loss(train) 48.4414[0m
+[30mEpoch 2480 Loss(train) 48.1733[0m
+[30mEpoch 2520 Loss(train) 47.0400[0m
+[30mEpoch 2560 Loss(train) 48.0668[0m
+Loss  :: (0.03, 0.04, 2.20, 2.20)
+Ratio :: (0.70:0.85:49.23:49.23)
+Loss  :: (0.09, 0.12, 1.33, 1.33)
+Ratio :: (2.98:4.08:46.47:46.47)
+Loss  :: (0.21, 0.35, 7.44, 7.44)
+Ratio :: (1.34:2.27:48.19:48.19)
+Loss  :: (0.11, 0.15, 4.15, 4.15)
+Ratio :: (1.32:1.71:48.48:48.48)
+Loss  :: (0.10, 0.18, 3.23, 3.23)
+Ratio :: (1.55:2.68:47.89:47.89)
+[33mEpoch 2600 Loss(val) Increase - 13.28s[0m
+  - current: 10.4031
+  - best   : 10.3367
+[30mEpoch 2640 Loss(train) 47.6519[0m
+[30mEpoch 2680 Loss(train) 48.1564[0m
+[30mEpoch 2720 Loss(train) 46.3534[0m
+[30mEpoch 2760 Loss(train) 46.3674[0m
+Loss  :: (0.03, 0.03, 2.42, 2.42)
+Ratio :: (0.53:0.57:49.45:49.45)
+Loss  :: (0.08, 0.10, 1.49, 1.49)
+Ratio :: (2.48:3.15:47.18:47.18)
+Loss  :: (0.14, 0.22, 7.66, 7.66)
+Ratio :: (0.92:1.43:48.82:48.82)
+Loss  :: (0.09, 0.10, 4.35, 4.35)
+Ratio :: (0.96:1.11:48.96:48.96)
+Loss  :: (0.10, 0.16, 3.11, 3.11)
+Ratio :: (1.49:2.54:47.99:47.99)
+[33mEpoch 2800 Loss(val) Increase - 13.39s[0m
+  - current: 10.6769
+  - best   : 10.3367
+[30mEpoch 2840 Loss(train) 46.4024[0m
+[30mEpoch 2880 Loss(train) 46.6113[0m
+[30mEpoch 2920 Loss(train) 46.1152[0m
+[30mEpoch 2960 Loss(train) 46.8170[0m
+Loss  :: (0.03, 0.04, 2.54, 2.54)
+Ratio :: (0.58:0.70:49.36:49.36)
+Loss  :: (0.08, 0.11, 1.49, 1.49)
+Ratio :: (2.40:3.41:47.10:47.10)
+Loss  :: (0.16, 0.26, 7.75, 7.75)
+Ratio :: (1.02:1.63:48.67:48.67)
+Loss  :: (0.11, 0.13, 4.43, 4.43)
+Ratio :: (1.16:1.48:48.68:48.68)
+Loss  :: (0.11, 0.19, 3.28, 3.28)
+Ratio :: (1.61:2.81:47.79:47.79)
+[33mEpoch 3000 Loss(val) Increase - 13.23s[0m
+  - current: 11.0095
+  - best   : 10.3367
+[30mEpoch 3040 Loss(train) 45.3747[0m
+[30mEpoch 3080 Loss(train) 44.6932[0m
+[30mEpoch 3120 Loss(train) 44.8480[0m
+[30mEpoch 3160 Loss(train) 44.0654[0m
+Loss  :: (0.03, 0.04, 2.48, 2.48)
+Ratio :: (0.61:0.73:49.33:49.33)
+Loss  :: (0.06, 0.09, 1.62, 1.62)
+Ratio :: (1.88:2.57:47.78:47.78)
+Loss  :: (0.15, 0.24, 7.83, 7.83)
+Ratio :: (0.94:1.47:48.80:48.80)
+Loss  :: (0.09, 0.11, 4.79, 4.79)
+Ratio :: (0.93:1.08:49.00:49.00)
+Loss  :: (0.11, 0.20, 3.08, 3.08)
+Ratio :: (1.73:3.03:47.62:47.62)
+[33mEpoch 3200 Loss(val) Increase - 13.36s[0m
+  - current: 11.1527
+  - best   : 10.3367
+[30mEpoch 3240 Loss(train) 44.2939[0m
+[30mEpoch 3280 Loss(train) 44.4109[0m
+[30mEpoch 3320 Loss(train) 44.3989[0m
+[30mEpoch 3360 Loss(train) 44.2140[0m
+Loss  :: (0.03, 0.03, 2.47, 2.47)
+Ratio :: (0.55:0.62:49.42:49.42)
+Loss  :: (0.07, 0.09, 1.52, 1.52)
+Ratio :: (2.16:2.91:47.47:47.47)
+Loss  :: (0.15, 0.23, 7.91, 7.91)
+Ratio :: (0.90:1.39:48.85:48.85)
+Loss  :: (0.09, 0.11, 4.79, 4.79)
+Ratio :: (0.94:1.09:48.98:48.98)
+Loss  :: (0.11, 0.20, 3.08, 3.08)
+Ratio :: (1.74:3.05:47.61:47.61)
+[33mEpoch 3400 Loss(val) Increase - 13.33s[0m
+  - current: 11.1335
+  - best   : 10.3367
+[30mEpoch 3440 Loss(train) 43.9510[0m
+[30mEpoch 3480 Loss(train) 43.6628[0m
+[30mEpoch 3520 Loss(train) 43.3515[0m
+[30mEpoch 3560 Loss(train) 43.6721[0m
+Loss  :: (0.03, 0.03, 2.45, 2.45)
+Ratio :: (0.53:0.57:49.45:49.45)
+Loss  :: (0.07, 0.09, 1.51, 1.51)
+Ratio :: (2.20:2.89:47.45:47.45)
+Loss  :: (0.15, 0.23, 7.81, 7.81)
+Ratio :: (0.91:1.41:48.84:48.84)
+Loss  :: (0.09, 0.10, 4.54, 4.54)
+Ratio :: (0.96:1.09:48.98:48.98)
+Loss  :: (0.10, 0.18, 2.98, 2.98)
+Ratio :: (1.68:2.92:47.70:47.70)
+[33mEpoch 3600 Loss(val) Increase - 13.36s[0m
+  - current: 10.8419
+  - best   : 10.3367
+[30mEpoch 3640 Loss(train) 43.4852[0m
+[30mEpoch 3680 Loss(train) 43.3050[0m
+[30mEpoch 3720 Loss(train) 42.6682[0m
+[30mEpoch 3760 Loss(train) 42.8420[0m
+Loss  :: (0.03, 0.03, 2.59, 2.59)
+Ratio :: (0.52:0.57:49.45:49.45)
+Loss  :: (0.06, 0.08, 1.51, 1.51)
+Ratio :: (1.97:2.63:47.70:47.70)
+Loss  :: (0.15, 0.23, 7.91, 7.91)
+Ratio :: (0.91:1.40:48.85:48.85)
+Loss  :: (0.09, 0.10, 4.48, 4.48)
+Ratio :: (0.95:1.04:49.00:49.00)
+Loss  :: (0.11, 0.18, 3.12, 3.12)
+Ratio :: (1.62:2.83:47.77:47.77)
+[33mEpoch 3800 Loss(val) Increase - 13.58s[0m
+  - current: 11.0302
+  - best   : 10.3367
+[30mEpoch 3840 Loss(train) 43.0733[0m
+[30mEpoch 3880 Loss(train) 42.7545[0m
+[30mEpoch 3920 Loss(train) 42.7473[0m
+[30mEpoch 3960 Loss(train) 42.6548[0m
+Loss  :: (0.03, 0.03, 2.48, 2.48)
+Ratio :: (0.53:0.58:49.44:49.44)
+Loss  :: (0.08, 0.10, 1.56, 1.56)
+Ratio :: (2.30:2.96:47.37:47.37)
+Loss  :: (0.15, 0.23, 7.88, 7.88)
+Ratio :: (0.91:1.41:48.84:48.84)
+Loss  :: (0.10, 0.11, 4.53, 4.53)
+Ratio :: (1.03:1.20:48.88:48.88)
+Loss  :: (0.11, 0.19, 3.09, 3.09)
+Ratio :: (1.70:2.98:47.66:47.66)
+[33mEpoch 4000 Loss(val) Increase - 13.27s[0m
+  - current: 10.9851
+  - best   : 10.3367
+[1m[36m
+  Train is over  
+[0m
+[32mTesting ... [0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+Loss  :: (0.03, 0.03, 6.61, 6.61)
+Ratio :: (0.21:0.26:49.76:49.76)
+Loss  :: (0.04, 0.05, 5.80, 5.80)
+Ratio :: (0.36:0.41:49.61:49.61)
+Loss  :: (0.12, 0.19, 21.58, 21.58)
+Ratio :: (0.28:0.44:49.64:49.64)
+Loss  :: (0.13, 0.20, 27.95, 27.95)
+Ratio :: (0.24:0.35:49.71:49.71)
+Loss  :: (0.11, 0.19, 6.65, 6.65)
+Ratio :: (0.82:1.42:48.88:48.88)
+  final_loss/val:  10.336728635526645
+  final_loss/test:  39.25804591307346
+{'lr': -1.0, 'mode': 'test', 'id': '220412_c32_1', 'c': 32}
+[32mNote :: params/net/c0 = 32[0m
+[32mPreprocess ... [0m
+  MH_01_easy is already pre-processed.
+  MH_02_easy is already pre-processed.
+  MH_03_medium is already pre-processed.
+  MH_04_difficult is already pre-processed.
+  MH_05_difficult is already pre-processed.
+  V1_01_easy is already pre-processed.
+  V1_02_medium is already pre-processed.
+  V1_03_difficult is already pre-processed.
+  V2_01_easy is already pre-processed.
+  V2_02_medium is already pre-processed.
+  V2_03_difficult is already pre-processed.
+  -- success --
+
+[32mInitilaize DGANet ...[0m
+  It's a DNN Model for denoising IMU sensor's raw measurements (both gryo & accel)
+  -- success --
+
+[1m[36m
+========== Test ==========
+[0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[32mTest ... [0m
+  - MH_02_easy      a_hat: <class 'torch.Tensor'> torch.Size([29952, 3]) torch.float32
+    w_hat: <class 'torch.Tensor'> torch.Size([29952, 3]) torch.float32
+[ok]
+  - MH_04_difficult      a_hat: <class 'torch.Tensor'> torch.Size([19712, 3]) torch.float32
+    w_hat: <class 'torch.Tensor'> torch.Size([19712, 3]) torch.float32
+[ok]
+  - V2_02_medium      a_hat: <class 'torch.Tensor'> torch.Size([23072, 3]) torch.float32
+    w_hat: <class 'torch.Tensor'> torch.Size([23072, 3]) torch.float32
+[ok]
+  - V1_03_difficult      a_hat: <class 'torch.Tensor'> torch.Size([20896, 3]) torch.float32
+    w_hat: <class 'torch.Tensor'> torch.Size([20896, 3]) torch.float32
+[ok]
+  - V1_01_easy      a_hat: <class 'torch.Tensor'> torch.Size([28672, 3]) torch.float32
+    w_hat: <class 'torch.Tensor'> torch.Size([28672, 3]) torch.float32
+[ok]
+  --success
+{'lr': -1.0, 'id': '220412_c32_1', 'c': 32, 'mode': 'anal'}
+[32mNote :: params/net/c0 = 32[0m
+[32mPreprocess ... [0m
+  MH_01_easy is already pre-processed.
+  MH_02_easy is already pre-processed.
+  MH_03_medium is already pre-processed.
+  MH_04_difficult is already pre-processed.
+  MH_05_difficult is already pre-processed.
+  V1_01_easy is already pre-processed.
+  V1_02_medium is already pre-processed.
+  V1_03_difficult is already pre-processed.
+  V2_01_easy is already pre-processed.
+  V2_02_medium is already pre-processed.
+  V2_03_difficult is already pre-processed.
+  -- success --
+
+[33m  No need to initialize a model[0m
+[1m[36m
+========== Analysis ==========
+[0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[32mOn MH_02_easy ... [0m[34m[ok]
+[0m
+[32mOn MH_04_difficult ... [0m[34m[ok]
+[0m
+[32mOn V2_02_medium ... [0m[34m[ok]
+[0m
+[32mOn V1_03_difficult ... [0m[34m[ok]
+[0m
+[32mOn V1_01_easy ... [0m[34m[ok]
+[0m
+{'id': '220412_c32_2', 'mode': 'train', 'c': 32, 'lr': -1.0}
+[32mNote :: params/net/c0 = 32[0m
+[32mPreprocess ... [0m
+  MH_01_easy is already pre-processed.
+  MH_02_easy is already pre-processed.
+  MH_03_medium is already pre-processed.
+  MH_04_difficult is already pre-processed.
+  MH_05_difficult is already pre-processed.
+  V1_01_easy is already pre-processed.
+  V1_02_medium is already pre-processed.
+  V1_03_difficult is already pre-processed.
+  V2_01_easy is already pre-processed.
+  V2_02_medium is already pre-processed.
+  V2_03_difficult is already pre-processed.
+  -- success --
+
+[32mInitilaize DGANet ...[0m
+  It's a DNN Model for denoising IMU sensor's raw measurements (both gryo & accel)
+  -- success --
+
+[1m[36m
+========== Train ==========
+[0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[30mEpoch   40 Loss(train) 596.3225[0m
+[30mEpoch   80 Loss(train) 518.7973[0m
+[30mEpoch  120 Loss(train) 426.3541[0m
+[30mEpoch  160 Loss(train) 300.8437[0m
+Loss  :: (0.09, 0.15, 3.76, 3.76)
+Ratio :: (1.17:1.99:48.42:48.42)
+Loss  :: (0.19, 0.26, 2.01, 2.01)
+Ratio :: (4.32:5.72:44.98:44.98)
+Loss  :: (0.44, 0.78, 12.04, 12.04)
+Ratio :: (1.74:3.09:47.58:47.58)
+Loss  :: (0.32, 0.54, 7.13, 7.13)
+Ratio :: (2.09:3.55:47.18:47.18)
+Loss  :: (0.15, 0.26, 3.74, 3.74)
+Ratio :: (1.93:3.33:47.37:47.37)
+[34mEpoch  200 Loss(val) Decrease - 13.35s[0m
+  - current: 16.6457
+  - best   : 10000.0000
+[30mEpoch  240 Loss(train) 117.5937[0m
+[30mEpoch  280 Loss(train) 74.3986[0m
+[30mEpoch  320 Loss(train) 59.7937[0m
+[30mEpoch  360 Loss(train) 56.3088[0m
+Loss  :: (0.04, 0.05, 2.25, 2.25)
+Ratio :: (0.78:1.05:49.09:49.09)
+Loss  :: (0.16, 0.21, 1.65, 1.65)
+Ratio :: (4.29:5.78:44.96:44.96)
+Loss  :: (0.17, 0.28, 7.64, 7.64)
+Ratio :: (1.10:1.77:48.56:48.56)
+Loss  :: (0.13, 0.18, 4.29, 4.29)
+Ratio :: (1.43:2.00:48.28:48.28)
+Loss  :: (0.11, 0.19, 3.31, 3.31)
+Ratio :: (1.61:2.79:47.80:47.80)
+[34mEpoch  400 Loss(val) Decrease - 13.23s[0m
+  - current: 10.7951
+  - best   : 16.6457
+[30mEpoch  440 Loss(train) 50.0466[0m
+[30mEpoch  480 Loss(train) 48.8263[0m
+[30mEpoch  520 Loss(train) 48.0665[0m
+[30mEpoch  560 Loss(train) 47.4183[0m
+Loss  :: (0.03, 0.04, 2.00, 2.00)
+Ratio :: (0.74:0.88:49.19:49.19)
+Loss  :: (0.08, 0.11, 1.67, 1.67)
+Ratio :: (2.28:2.99:47.36:47.36)
+Loss  :: (0.16, 0.26, 7.61, 7.61)
+Ratio :: (1.05:1.65:48.65:48.65)
+Loss  :: (0.11, 0.13, 3.93, 3.93)
+Ratio :: (1.30:1.55:48.57:48.57)
+Loss  :: (0.10, 0.17, 3.16, 3.16)
+Ratio :: (1.54:2.64:47.91:47.91)
+[34mEpoch  600 Loss(val) Decrease - 13.25s[0m
+  - current: 10.2430
+  - best   : 10.7951
+[30mEpoch  640 Loss(train) 141.0949[0m
+[30mEpoch  680 Loss(train) 99.9784[0m
+[30mEpoch  720 Loss(train) 90.6145[0m
+[30mEpoch  760 Loss(train) 70.1705[0m
+Loss  :: (1.55, 2.78, 2.93, 2.93)
+Ratio :: (15.23:27.31:28.73:28.73)
+Loss  :: (2.21, 3.34, 1.60, 1.60)
+Ratio :: (25.26:38.18:18.28:18.28)
+Loss  :: (6.21, 8.04, 7.63, 7.63)
+Ratio :: (21.05:27.25:25.85:25.85)
+Loss  :: (5.22, 6.91, 3.74, 3.74)
+Ratio :: (26.62:35.27:19.05:19.05)
+Loss  :: (1.46, 2.52, 3.82, 3.82)
+Ratio :: (12.56:21.68:32.88:32.88)
+[33mEpoch  800 Loss(val) Increase - 13.04s[0m
+  - current: 18.8935
+  - best   : 10.2430
+[30mEpoch  840 Loss(train) 67.9753[0m
+[30mEpoch  880 Loss(train) 55.9109[0m
+[30mEpoch  920 Loss(train) 53.2231[0m
+[30mEpoch  960 Loss(train) 52.6430[0m
+Loss  :: (0.03, 0.03, 2.13, 2.13)
+Ratio :: (0.66:0.77:49.28:49.28)
+Loss  :: (0.08, 0.10, 1.14, 1.14)
+Ratio :: (3.07:3.99:46.47:46.47)
+Loss  :: (0.14, 0.22, 7.27, 7.27)
+Ratio :: (0.95:1.48:48.78:48.78)
+Loss  :: (0.10, 0.13, 3.19, 3.19)
+Ratio :: (1.55:2.04:48.21:48.21)
+Loss  :: (0.10, 0.17, 3.44, 3.44)
+Ratio :: (1.41:2.42:48.08:48.08)
+[34mEpoch 1000 Loss(val) Decrease - 13.35s[0m
+  - current: 9.6519
+  - best   : 10.2430
+[30mEpoch 1040 Loss(train) 50.2243[0m
+[30mEpoch 1080 Loss(train) 49.3926[0m
+[30mEpoch 1120 Loss(train) 48.3329[0m
+[30mEpoch 1160 Loss(train) 48.0084[0m
+Loss  :: (0.03, 0.03, 2.05, 2.05)
+Ratio :: (0.65:0.75:49.30:49.30)
+Loss  :: (0.07, 0.09, 1.26, 1.26)
+Ratio :: (2.59:3.24:47.09:47.09)
+Loss  :: (0.14, 0.22, 7.72, 7.72)
+Ratio :: (0.90:1.38:48.86:48.86)
+Loss  :: (0.10, 0.13, 3.94, 3.94)
+Ratio :: (1.27:1.65:48.54:48.54)
+Loss  :: (0.10, 0.17, 3.06, 3.06)
+Ratio :: (1.52:2.60:47.94:47.94)
+[33mEpoch 1200 Loss(val) Increase - 13.18s[0m
+  - current: 10.1554
+  - best   : 9.6519
+[30mEpoch 1240 Loss(train) 47.1588[0m
+[30mEpoch 1280 Loss(train) 46.3648[0m
+[30mEpoch 1320 Loss(train) 46.6131[0m
+[30mEpoch 1360 Loss(train) 45.9800[0m
+Loss  :: (0.03, 0.04, 2.15, 2.15)
+Ratio :: (0.68:0.83:49.24:49.24)
+Loss  :: (0.07, 0.09, 1.36, 1.36)
+Ratio :: (2.37:3.02:47.30:47.30)
+Loss  :: (0.15, 0.23, 8.09, 8.09)
+Ratio :: (0.89:1.39:48.86:48.86)
+Loss  :: (0.10, 0.12, 3.96, 3.96)
+Ratio :: (1.18:1.51:48.66:48.66)
+Loss  :: (0.10, 0.18, 3.16, 3.16)
+Ratio :: (1.56:2.68:47.88:47.88)
+[33mEpoch 1400 Loss(val) Increase - 13.16s[0m
+  - current: 10.5425
+  - best   : 9.6519
+[30mEpoch 1440 Loss(train) 44.8124[0m
+[30mEpoch 1480 Loss(train) 44.7839[0m
+[30mEpoch 1520 Loss(train) 44.6756[0m
+[30mEpoch 1560 Loss(train) 44.0139[0m
+Loss  :: (0.03, 0.03, 2.04, 2.04)
+Ratio :: (0.67:0.77:49.28:49.28)
+Loss  :: (0.06, 0.08, 1.32, 1.32)
+Ratio :: (2.23:2.81:47.48:47.48)
+Loss  :: (0.15, 0.23, 8.14, 8.14)
+Ratio :: (0.89:1.38:48.87:48.87)
+Loss  :: (0.11, 0.14, 4.06, 4.06)
+Ratio :: (1.28:1.70:48.51:48.51)
+Loss  :: (0.10, 0.18, 3.21, 3.21)
+Ratio :: (1.55:2.66:47.89:47.89)
+[33mEpoch 1600 Loss(val) Increase - 13.36s[0m
+  - current: 10.5564
+  - best   : 9.6519
+[30mEpoch 1640 Loss(train) 43.7682[0m
+[30mEpoch 1680 Loss(train) 43.5434[0m
+[30mEpoch 1720 Loss(train) 43.3660[0m
+[30mEpoch 1760 Loss(train) 43.5134[0m
+Loss  :: (0.03, 0.04, 1.97, 1.97)
+Ratio :: (0.74:0.88:49.19:49.19)
+Loss  :: (0.07, 0.08, 1.34, 1.34)
+Ratio :: (2.31:2.91:47.39:47.39)
+Loss  :: (0.15, 0.24, 8.00, 8.00)
+Ratio :: (0.93:1.45:48.81:48.81)
+Loss  :: (0.11, 0.14, 4.16, 4.16)
+Ratio :: (1.23:1.63:48.57:48.57)
+Loss  :: (0.10, 0.18, 3.06, 3.06)
+Ratio :: (1.64:2.82:47.77:47.77)
+[33mEpoch 1800 Loss(val) Increase - 13.60s[0m
+  - current: 10.4110
+  - best   : 9.6519
+[30mEpoch 1840 Loss(train) 136.9747[0m
+[30mEpoch 1880 Loss(train) 85.9950[0m
+[30mEpoch 1920 Loss(train) 71.0952[0m
+[30mEpoch 1960 Loss(train) 64.6633[0m
+Loss  :: (0.03, 0.03, 2.81, 2.81)
+Ratio :: (0.47:0.52:49.51:49.51)
+Loss  :: (0.07, 0.09, 1.64, 1.64)
+Ratio :: (2.14:2.48:47.69:47.69)
+Loss  :: (0.15, 0.24, 7.69, 7.69)
+Ratio :: (0.94:1.50:48.78:48.78)
+Loss  :: (0.09, 0.10, 3.75, 3.75)
+Ratio :: (1.13:1.36:48.75:48.75)
+Loss  :: (0.09, 0.16, 3.90, 3.90)
+Ratio :: (1.17:1.98:48.43:48.43)
+[33mEpoch 2000 Loss(val) Increase - 13.20s[0m
+  - current: 11.1554
+  - best   : 9.6519
+[30mEpoch 2040 Loss(train) 57.5372[0m
+[30mEpoch 2080 Loss(train) 58.7583[0m
+[30mEpoch 2120 Loss(train) 52.8819[0m
+[30mEpoch 2160 Loss(train) 52.2141[0m
+Loss  :: (0.03, 0.04, 3.10, 3.10)
+Ratio :: (0.53:0.67:49.40:49.40)
+Loss  :: (0.07, 0.09, 1.26, 1.26)
+Ratio :: (2.47:3.19:47.17:47.17)
+Loss  :: (0.15, 0.24, 7.33, 7.33)
+Ratio :: (1.01:1.60:48.69:48.69)
+Loss  :: (0.11, 0.15, 3.70, 3.70)
+Ratio :: (1.42:1.95:48.31:48.31)
+Loss  :: (0.11, 0.19, 3.07, 3.07)
+Ratio :: (1.66:2.89:47.73:47.73)
+[33mEpoch 2200 Loss(val) Increase - 13.47s[0m
+  - current: 10.4305
+  - best   : 9.6519
+[30mEpoch 2240 Loss(train) 51.5847[0m
+[30mEpoch 2280 Loss(train) 52.5121[0m
+[30mEpoch 2320 Loss(train) 50.5798[0m
+[30mEpoch 2360 Loss(train) 49.4303[0m
+Loss  :: (0.03, 0.04, 2.72, 2.72)
+Ratio :: (0.61:0.78:49.30:49.30)
+Loss  :: (0.08, 0.11, 1.76, 1.76)
+Ratio :: (2.08:2.91:47.50:47.50)
+Loss  :: (0.16, 0.25, 7.68, 7.68)
+Ratio :: (1.00:1.59:48.71:48.71)
+Loss  :: (0.11, 0.14, 3.49, 3.49)
+Ratio :: (1.50:1.99:48.26:48.26)
+Loss  :: (0.10, 0.18, 2.86, 2.86)
+Ratio :: (1.72:2.96:47.66:47.66)
+[33mEpoch 2400 Loss(val) Increase - 13.65s[0m
+  - current: 10.4721
+  - best   : 9.6519
+[30mEpoch 2440 Loss(train) 48.4437[0m
+[30mEpoch 2480 Loss(train) 50.4688[0m
+[30mEpoch 2520 Loss(train) 48.0431[0m
+[30mEpoch 2560 Loss(train) 49.2477[0m
+Loss  :: (0.03, 0.04, 2.43, 2.43)
+Ratio :: (0.67:0.86:49.23:49.23)
+Loss  :: (0.09, 0.12, 1.91, 1.91)
+Ratio :: (2.30:2.98:47.36:47.36)
+Loss  :: (0.15, 0.24, 7.83, 7.83)
+Ratio :: (0.93:1.47:48.80:48.80)
+Loss  :: (0.11, 0.15, 3.60, 3.60)
+Ratio :: (1.43:1.98:48.30:48.30)
+Loss  :: (0.11, 0.20, 2.92, 2.92)
+Ratio :: (1.83:3.21:47.48:47.48)
+[33mEpoch 2600 Loss(val) Increase - 13.38s[0m
+  - current: 10.5486
+  - best   : 9.6519
+[30mEpoch 2640 Loss(train) 47.2830[0m
+[30mEpoch 2680 Loss(train) 46.5975[0m
+[30mEpoch 2720 Loss(train) 47.0460[0m
+[30mEpoch 2760 Loss(train) 46.8880[0m
+Loss  :: (0.03, 0.03, 2.39, 2.39)
+Ratio :: (0.61:0.72:49.34:49.34)
+Loss  :: (0.07, 0.09, 1.44, 1.44)
+Ratio :: (2.34:2.87:47.40:47.40)
+Loss  :: (0.15, 0.24, 7.74, 7.74)
+Ratio :: (0.97:1.52:48.75:48.75)
+Loss  :: (0.09, 0.11, 3.35, 3.35)
+Ratio :: (1.34:1.64:48.51:48.51)
+Loss  :: (0.10, 0.18, 2.99, 2.99)
+Ratio :: (1.66:2.85:47.75:47.75)
+[33mEpoch 2800 Loss(val) Increase - 13.07s[0m
+  - current: 10.0981
+  - best   : 9.6519
+[30mEpoch 2840 Loss(train) 46.0412[0m
+[30mEpoch 2880 Loss(train) 45.6917[0m
+[30mEpoch 2920 Loss(train) 45.8086[0m
+[30mEpoch 2960 Loss(train) 45.5676[0m
+Loss  :: (0.03, 0.04, 2.49, 2.49)
+Ratio :: (0.64:0.80:49.28:49.28)
+Loss  :: (0.07, 0.09, 1.50, 1.50)
+Ratio :: (2.14:2.79:47.54:47.54)
+Loss  :: (0.17, 0.28, 8.28, 8.28)
+Ratio :: (1.01:1.62:48.68:48.68)
+Loss  :: (0.09, 0.10, 3.99, 3.99)
+Ratio :: (1.08:1.28:48.82:48.82)
+Loss  :: (0.12, 0.21, 3.36, 3.36)
+Ratio :: (1.67:2.95:47.69:47.69)
+[33mEpoch 3000 Loss(val) Increase - 13.07s[0m
+  - current: 11.1254
+  - best   : 9.6519
+[30mEpoch 3040 Loss(train) 46.0319[0m
+[30mEpoch 3080 Loss(train) 46.0333[0m
+[30mEpoch 3120 Loss(train) 44.8739[0m
+[30mEpoch 3160 Loss(train) 44.9457[0m
+Loss  :: (0.03, 0.03, 2.44, 2.44)
+Ratio :: (0.52:0.56:49.46:49.46)
+Loss  :: (0.06, 0.07, 1.75, 1.75)
+Ratio :: (1.60:2.00:48.20:48.20)
+Loss  :: (0.15, 0.23, 8.63, 8.63)
+Ratio :: (0.85:1.32:48.91:48.91)
+Loss  :: (0.09, 0.10, 3.73, 3.73)
+Ratio :: (1.13:1.36:48.75:48.75)
+Loss  :: (0.10, 0.17, 3.32, 3.32)
+Ratio :: (1.47:2.53:48.00:48.00)
+[33mEpoch 3200 Loss(val) Increase - 13.28s[0m
+  - current: 11.2256
+  - best   : 9.6519
+[30mEpoch 3240 Loss(train) 44.6331[0m
+[30mEpoch 3280 Loss(train) 44.8651[0m
+[30mEpoch 3320 Loss(train) 44.2048[0m
+[30mEpoch 3360 Loss(train) 44.1913[0m
+Loss  :: (0.03, 0.03, 2.32, 2.32)
+Ratio :: (0.57:0.63:49.40:49.40)
+Loss  :: (0.06, 0.08, 1.48, 1.48)
+Ratio :: (1.92:2.45:47.81:47.81)
+Loss  :: (0.15, 0.23, 8.43, 8.43)
+Ratio :: (0.88:1.36:48.88:48.88)
+Loss  :: (0.08, 0.10, 3.87, 3.87)
+Ratio :: (1.06:1.20:48.87:48.87)
+Loss  :: (0.11, 0.18, 3.17, 3.17)
+Ratio :: (1.59:2.75:47.83:47.83)
+[33mEpoch 3400 Loss(val) Increase - 13.24s[0m
+  - current: 10.8676
+  - best   : 9.6519
+[30mEpoch 3440 Loss(train) 44.1270[0m
+[30mEpoch 3480 Loss(train) 43.7013[0m
+[30mEpoch 3520 Loss(train) 43.4990[0m
+[30mEpoch 3560 Loss(train) 43.1980[0m
+Loss  :: (0.03, 0.03, 2.23, 2.23)
+Ratio :: (0.58:0.63:49.40:49.40)
+Loss  :: (0.06, 0.08, 1.66, 1.66)
+Ratio :: (1.84:2.30:47.93:47.93)
+Loss  :: (0.16, 0.24, 8.34, 8.34)
+Ratio :: (0.91:1.41:48.84:48.84)
+Loss  :: (0.09, 0.11, 3.77, 3.77)
+Ratio :: (1.15:1.37:48.74:48.74)
+Loss  :: (0.10, 0.18, 2.99, 2.99)
+Ratio :: (1.66:2.86:47.74:47.74)
+[33mEpoch 3600 Loss(val) Increase - 13.56s[0m
+  - current: 10.6979
+  - best   : 9.6519
+[30mEpoch 3640 Loss(train) 43.4325[0m
+[30mEpoch 3680 Loss(train) 43.4159[0m
+[30mEpoch 3720 Loss(train) 42.8610[0m
+[30mEpoch 3760 Loss(train) 43.3223[0m
+Loss  :: (0.03, 0.03, 2.30, 2.30)
+Ratio :: (0.56:0.60:49.42:49.42)
+Loss  :: (0.06, 0.08, 1.56, 1.56)
+Ratio :: (1.90:2.33:47.88:47.88)
+Loss  :: (0.15, 0.23, 8.23, 8.23)
+Ratio :: (0.89:1.38:48.87:48.87)
+Loss  :: (0.09, 0.11, 3.77, 3.77)
+Ratio :: (1.14:1.39:48.74:48.74)
+Loss  :: (0.10, 0.18, 3.07, 3.07)
+Ratio :: (1.62:2.79:47.80:47.80)
+[33mEpoch 3800 Loss(val) Increase - 13.51s[0m
+  - current: 10.6628
+  - best   : 9.6519
+[30mEpoch 3840 Loss(train) 42.8100[0m
+[30mEpoch 3880 Loss(train) 42.4322[0m
+[30mEpoch 3920 Loss(train) 42.4020[0m
+[30mEpoch 3960 Loss(train) 42.6764[0m
+Loss  :: (0.03, 0.03, 2.30, 2.30)
+Ratio :: (0.54:0.57:49.45:49.45)
+Loss  :: (0.06, 0.07, 1.76, 1.76)
+Ratio :: (1.57:1.99:48.22:48.22)
+Loss  :: (0.15, 0.24, 8.23, 8.23)
+Ratio :: (0.91:1.40:48.85:48.85)
+Loss  :: (0.09, 0.11, 4.06, 4.06)
+Ratio :: (1.07:1.28:48.82:48.82)
+Loss  :: (0.10, 0.17, 3.04, 3.04)
+Ratio :: (1.57:2.68:47.88:47.88)
+[33mEpoch 4000 Loss(val) Increase - 13.27s[0m
+  - current: 10.9192
+  - best   : 9.6519
+[1m[36m
+  Train is over  
+[0m
+[32mTesting ... [0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+Loss  :: (0.03, 0.04, 6.94, 6.94)
+Ratio :: (0.21:0.28:49.75:49.75)
+Loss  :: (0.05, 0.06, 5.88, 5.88)
+Ratio :: (0.40:0.49:49.56:49.56)
+Loss  :: (0.13, 0.20, 21.98, 21.98)
+Ratio :: (0.29:0.45:49.63:49.63)
+Loss  :: (0.15, 0.23, 22.61, 22.61)
+Ratio :: (0.33:0.50:49.59:49.59)
+Loss  :: (0.11, 0.18, 6.83, 6.83)
+Ratio :: (0.76:1.30:48.97:48.97)
+  final_loss/val:  9.651941464569608
+  final_loss/test:  36.6804548103407
+{'id': '220412_c32_2', 'lr': -1.0, 'c': 32, 'mode': 'test'}
+[32mNote :: params/net/c0 = 32[0m
+[32mPreprocess ... [0m
+  MH_01_easy is already pre-processed.
+  MH_02_easy is already pre-processed.
+  MH_03_medium is already pre-processed.
+  MH_04_difficult is already pre-processed.
+  MH_05_difficult is already pre-processed.
+  V1_01_easy is already pre-processed.
+  V1_02_medium is already pre-processed.
+  V1_03_difficult is already pre-processed.
+  V2_01_easy is already pre-processed.
+  V2_02_medium is already pre-processed.
+  V2_03_difficult is already pre-processed.
+  -- success --
+
+[32mInitilaize DGANet ...[0m
+  It's a DNN Model for denoising IMU sensor's raw measurements (both gryo & accel)
+  -- success --
+
+[1m[36m
+========== Test ==========
+[0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[32mTest ... [0m
+  - MH_02_easy      w_hat: <class 'torch.Tensor'> torch.Size([29952, 3]) torch.float32
+    a_hat: <class 'torch.Tensor'> torch.Size([29952, 3]) torch.float32
+[ok]
+  - MH_04_difficult      w_hat: <class 'torch.Tensor'> torch.Size([19712, 3]) torch.float32
+    a_hat: <class 'torch.Tensor'> torch.Size([19712, 3]) torch.float32
+[ok]
+  - V2_02_medium      w_hat: <class 'torch.Tensor'> torch.Size([23072, 3]) torch.float32
+    a_hat: <class 'torch.Tensor'> torch.Size([23072, 3]) torch.float32
+[ok]
+  - V1_03_difficult      w_hat: <class 'torch.Tensor'> torch.Size([20896, 3]) torch.float32
+    a_hat: <class 'torch.Tensor'> torch.Size([20896, 3]) torch.float32
+[ok]
+  - V1_01_easy      w_hat: <class 'torch.Tensor'> torch.Size([28672, 3]) torch.float32
+    a_hat: <class 'torch.Tensor'> torch.Size([28672, 3]) torch.float32
+[ok]
+  --success
+{'c': 32, 'mode': 'anal', 'id': '220412_c32_2', 'lr': -1.0}
+[32mNote :: params/net/c0 = 32[0m
+[32mPreprocess ... [0m
+  MH_01_easy is already pre-processed.
+  MH_02_easy is already pre-processed.
+  MH_03_medium is already pre-processed.
+  MH_04_difficult is already pre-processed.
+  MH_05_difficult is already pre-processed.
+  V1_01_easy is already pre-processed.
+  V1_02_medium is already pre-processed.
+  V1_03_difficult is already pre-processed.
+  V2_01_easy is already pre-processed.
+  V2_02_medium is already pre-processed.
+  V2_03_difficult is already pre-processed.
+  -- success --
+
+[33m  No need to initialize a model[0m
+[1m[36m
+========== Analysis ==========
+[0m
+[32mLoad nf.p ...[0m
+[33m  Training sequences must be equel to Normalized sequences below[0m
+  - MH_01_easy
+  - MH_03_medium
+  - MH_05_difficult
+  - V1_02_medium
+  - V2_01_easy
+  - V2_03_difficult
+[32mOn MH_02_easy ... [0m[34m[ok]
+[0m
+[32mOn MH_04_difficult ... [0m[34m[ok]
+[0m
+[32mOn V2_02_medium ... [0m[34m[ok]
+[0m
+[32mOn V1_03_difficult ... [0m[34m[ok]
+[0m
+[32mOn V1_01_easy ... [0m[34m[ok]
+[0m
