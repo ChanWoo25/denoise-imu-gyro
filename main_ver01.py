@@ -14,6 +14,7 @@ from termcolor import cprint
 
 import argparse
 parser = argparse.ArgumentParser(description='Process some integers.')
+parser.add_argument('--debug', type=bool, default=False)
 parser.add_argument('--mode', type=str, default='train')
 parser.add_argument('--id', type=str, default=None)
 parser.add_argument('-c', type=int, default=-1)
@@ -23,6 +24,7 @@ args = parser.parse_args()
 print(args.__dict__)
 
 params = {
+    'debug': args.debug,
     'result_dir': os.path.join('/root/denoise/results', args.id),
     'test_dir': os.path.join('/root/denoise/results', args.id, 'tests'),
 
@@ -85,7 +87,7 @@ params = {
             'w':  1e6,
             'huber': 0.005,
             'dt': 0.005,
-            'v_window': 16,
+            'v_windows': [64],
         },
         'scheduler_class': torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
         'scheduler': {
@@ -130,19 +132,19 @@ if __name__ == '__main__':
     if args.v_windows != [64]:
         params['train']['loss']['v_windows'] = args.v_windows
         params['dataset']['v_windows'] = args.v_windows
-        cprint('Note :: params/train/loss/v_window = %d' % args.v_windows, 'green')
+        cprint('Note :: params/train/loss/v_windows = ' + str(args.v_windows), 'green')
 
     process = LearningProcess(params, args.mode)
 
 
-    if args.mode == 'train':
-        cprint('\n========== Train ==========\n', 'cyan', attrs=['bold'])
-        process.train()
-    elif args.mode == 'test':
-        cprint('\n========== Test ==========\n', 'cyan', attrs=['bold'])
-        process.test()
-    elif args.mode == 'anal':
-        cprint('\n========== Analysis ==========\n', 'cyan', attrs=['bold'])
-        process.analyze()
-    else:
-        cprint("argument 'mode' must be one of ['train', 'test', 'anal']", 'red')
+    # if args.mode == 'train':
+    #     cprint('\n========== Train ==========\n', 'cyan', attrs=['bold'])
+    #     process.train()
+    # elif args.mode == 'test':
+    #     cprint('\n========== Test ==========\n', 'cyan', attrs=['bold'])
+    #     process.test()
+    # elif args.mode == 'anal':
+    #     cprint('\n========== Analysis ==========\n', 'cyan', attrs=['bold'])
+    #     process.analyze()
+    # else:
+    #     cprint("argument 'mode' must be one of ['train', 'test', 'anal']", 'red')

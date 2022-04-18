@@ -1,4 +1,3 @@
-from asyncore import loop
 import sys
 sys.path.append('/root/denoise')
 
@@ -60,18 +59,20 @@ class LearningProcess:
 
     def preprocess(self):
 
-        cprint('Preprocess ... ', 'green')
+        print('\n# Preprocess ... ')
         all_seqs = [*self.params['dataset']['train_seqs'], *self.params['dataset']['test_seqs']]
         all_seqs.sort()
-        v_window = self.params['train']['loss']['v_window']
+        dv_windows = [16, 32, 64] #
+        dv_normed_windows = [32, 64, 128, 256, 512] #
 
         for seq in all_seqs:
-            _file_path = os.path.join(self.params['dataset']['predata_dir'], '%s_v%d.p'%(seq, v_window))
-            if os.path.exists(_file_path):
+            _seq_dir = os.path.join(self.params['dataset']['predata_dir'], seq)
+            if os.path.exists(_seq_dir):
                 print('  %s is already pre-processed.' % seq)
                 continue
             else:
                 print('  %s is being pre-processed' % seq)
+                os.makedirs(_seq_dir)
 
             path_imu = os.path.join(self.params['dataset']['data_dir'], seq, "mav0", "imu0", "data.csv")
             imu = np.genfromtxt(path_imu, delimiter=",", skip_header=1)
@@ -141,39 +142,107 @@ class LearningProcess:
             dxi_ij = SO3.log(dRot_ij).cpu()
             # print("\tdxi_ij -- ", dxi_ij.shape, dxi_ij.dtype) # [29976, 3]
 
-            delta_v_gt = v_gt[:-mtf] - v_gt[mtf:]
+            ## COMPUTE gt_dv, gt_dv_normed
+            v_gt = v_gt.cuda() # torch.Size([N, 3]) torch.float64 cuda:0
+            _gt_dv = {}
+            for window_size in dv_windows:
+                _gt_dv[str(window_size)] = v_gt[window_size:] - v_gt[:-window_size]
 
-            ### Compute 511 size window normalized velocity
-            padding_size = 510
-            N = v_gt.shape[0]
-            _vs_gt = torch.cat([v_gt[0, :].unsqueeze(0).expand(padding_size, 3), v_gt], dim=0) # torch.Size([batch_size, 16510, 3])
-            _vs_gt_norm = []
-            for i in range(N):
-                window_batch = _vs_gt[i:i+padding_size+1] # torch.Size([6, 511, 3])
-                _std, _mean = torch.std_mean(window_batch, unbiased=False, dim=0)
-                _normalized = (window_batch[-1, :] - _mean)           # torch.Size([6, 3]) # 220414 평균만 제거 하는 쪽으로 선회
-                _normalized = _normalized.unsqueeze(0)                # torch.Size([6, 1, 3])
-                if i == 0:
-                    _vs_gt_norm.append(torch.zeros_like(_normalized))
-                else:
-                    _vs_gt_norm.append(_normalized)
-            _vs_gt_norm = torch.cat(_vs_gt_norm, dim=0) # torch.Size([6, 16000, 3])
+            _gt_dv_normed = {}
+            for window_size in dv_normed_windows:
+                N = v_gt.shape[0]
 
-            # save for all training
-            mondict = {
+                bread = torch.ones(window_size, N+window_size-1, 3, dtype=v_gt.dtype).cuda()
+                bread *= v_gt[0, :].expand_as(bread)
+                for i in range(window_size):
+                    bread[i, window_size-1-i:N+window_size-1-i] = v_gt
+                bread = bread[:, 0:N]
+
+                ## Debug
+                # for i in range(window_size):
+                #     li = bread[:, i, 0].tolist()
+                #     for e in li:
+                #         print('%.6f' % e, end=',')
+                #     print()
+                ##
+
+                _mean = bread.mean(dim=0)
+                _normalized = v_gt - _mean
+
+                ## Debug
+                # print('v_gt')
+                # print(v_gt[0:8, 0].tolist())
+                # print('_normalized:', _normalized.shape, _normalized.dtype)
+                # print(_normalized[0:8, 0].tolist())
+                ##
+
+                _gt_dv_normed[str(window_size)] = _normalized
+
+
+            ## SAVE
+            _data_path = os.path.join(_seq_dir, 'data.pt')
+            _data_dict = {
                 'ts': imu[:, 0].float(),
-                'us': imu[:, 1:].float(),
-                'dxi_ij': dxi_ij.float(),
+                'us': imu[:, 1:].float() }
+            torch.save(_data_dict, _data_path)
+
+            _gt_path = os.path.join(_seq_dir, 'gt.pt')
+            _gt_dict = {
                 'gt_interpolated': gt_interpolated.float(),
-                'delta_v_gt': delta_v_gt.float(),
-                'vs_gt_norm': _vs_gt_norm.float(),
+                'dw_16': dxi_ij.float()} # the 16-size window's euler angle difference
+            torch.save(_gt_dict, _gt_path)
+
+            _gt_dv_path = os.path.join(_seq_dir, 'dv.pt')
+            _gt_dv_dict = {
+                'dv': {
+                    '16': _gt_dv['16'].float(),
+                    '32': _gt_dv['32'].float(),
+                    '64': _gt_dv['64'].float(),
+                },
+                'dv_normed': {
+                    '32':   _gt_dv_normed['32'].float(),
+                    '64':   _gt_dv_normed['64'].float(),
+                    '128':  _gt_dv_normed['128'].float(),
+                    '256':  _gt_dv_normed['256'].float(),
+                    '512':  _gt_dv_normed['512'].float(),
+                }
             }
+            torch.save(_gt_dv_dict, _gt_dv_path)
 
-            for key, value in mondict.items():
-                print('    %s:'%key, type(value), value.shape, value.dtype)
+            ## CHECK
+            if self.params['debug']:
+                def print_dict(d:dict):
+                    for k, v in d.items():
+                        if type(v) is dict:
+                            print('  %s:' % k)
+                            print_dict(v)
+                        else:
+                            print('    %s:' % k, type(v), v.shape, v.dtype)
+                print_dict(_data_dict)
+                print_dict(_gt_dict)
+                print_dict(_gt_dv_dict)
 
-            pdump(mondict, _file_path)
-        print("  -- success --\n")
+    """
+    _mean: torch.Size([36381, 3]) torch.float64
+    _normalized: torch.Size([36381, 3]) torch.float64
+        ts: <class 'torch.Tensor'> torch.Size([36381]) torch.float32
+        us: <class 'torch.Tensor'> torch.Size([36381, 6]) torch.float32
+        dw_16: <class 'torch.Tensor'> torch.Size([36365, 3]) torch.float32
+        gt_interpolated: <class 'torch.Tensor'> torch.Size([36381, 17]) torch.float32
+    dv:
+        16: <class 'torch.Tensor'> torch.Size([36365, 3]) torch.float32
+        32: <class 'torch.Tensor'> torch.Size([36349, 3]) torch.float32
+        64: <class 'torch.Tensor'> torch.Size([36317, 3]) torch.float32
+    dv_normed:
+        32: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+        64: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+        512: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+        1024: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+        128: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+        256: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+    """
+
+    print("--- success ---")
 
     def train(self):
         """train the neural network. GPU is assumed"""
