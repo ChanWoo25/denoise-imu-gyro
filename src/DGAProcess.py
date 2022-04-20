@@ -1,7 +1,7 @@
+from cgi import parse_multipart
 import sys
 sys.path.append('/root/denoise')
 
-from email import header
 import torch
 import time
 import matplotlib.pyplot as plt
@@ -44,10 +44,10 @@ class LearningProcess:
             if not os.path.exists(self.params['result_dir']):
                 os.makedirs(self.params['result_dir'])
             ydump(self.params, params['result_dir'], 'params.yaml')
-            self.net = params['net_class'](**params['net'])
+            self.net = params['net_class'](params)
         elif mode == 'test':
             self.params = yload(params['result_dir'], 'params.yaml')
-            self.net = params['net_class'](**params['net'])
+            self.net = params['net_class'](params)
             weights = torch.load(self.weight_path)
             self.net.load_state_dict(weights)
         else:
@@ -58,7 +58,6 @@ class LearningProcess:
         self.net = self.net.cuda()
 
     def preprocess(self):
-
         print('\n# Preprocess ... ')
         all_seqs = [*self.params['dataset']['train_seqs'], *self.params['dataset']['test_seqs']]
         all_seqs.sort()
@@ -222,38 +221,34 @@ class LearningProcess:
                 print_dict(_gt_dict)
                 print_dict(_gt_dv_dict)
 
-    """
-    _mean: torch.Size([36381, 3]) torch.float64
-    _normalized: torch.Size([36381, 3]) torch.float64
-        ts: <class 'torch.Tensor'> torch.Size([36381]) torch.float32
-        us: <class 'torch.Tensor'> torch.Size([36381, 6]) torch.float32
-        dw_16: <class 'torch.Tensor'> torch.Size([36365, 3]) torch.float32
-        gt_interpolated: <class 'torch.Tensor'> torch.Size([36381, 17]) torch.float32
-    dv:
-        16: <class 'torch.Tensor'> torch.Size([36365, 3]) torch.float32
-        32: <class 'torch.Tensor'> torch.Size([36349, 3]) torch.float32
-        64: <class 'torch.Tensor'> torch.Size([36317, 3]) torch.float32
-    dv_normed:
-        32: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
-        64: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
-        512: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
-        1024: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
-        128: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
-        256: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
-    """
-
-    print("--- success ---")
+        print("--- success ---")
+        """
+        _mean: torch.Size([36381, 3]) torch.float64
+        _normalized: torch.Size([36381, 3]) torch.float64
+            ts: <class 'torch.Tensor'> torch.Size([36381]) torch.float32
+            us: <class 'torch.Tensor'> torch.Size([36381, 6]) torch.float32
+            dw_16: <class 'torch.Tensor'> torch.Size([36365, 3]) torch.float32
+            gt_interpolated: <class 'torch.Tensor'> torch.Size([36381, 17]) torch.float32
+        dv:
+            16: <class 'torch.Tensor'> torch.Size([36365, 3]) torch.float32
+            32: <class 'torch.Tensor'> torch.Size([36349, 3]) torch.float32
+            64: <class 'torch.Tensor'> torch.Size([36317, 3]) torch.float32
+        dv_normed:
+            32: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+            64: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+            512: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+            1024: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+            128: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+            256: <class 'torch.Tensor'> torch.Size([36381, 3]) torch.float32
+        """
 
     def train(self):
         """train the neural network. GPU is assumed"""
         ydump(self.params, self.params['result_dir'], 'params.yaml')
 
-
         # define datasets
-        dataset_train = DGADataset(**self.params['dataset'], mode='train')
-        dataset_train.init_train()
-        dataset_val = DGADataset(**self.params['dataset'], mode='val')
-        dataset_val.init_val()
+        dataset_train   = DGADataset(self.params, 'train')
+        dataset_val     = DGADataset(self.params, 'val')
 
         # Define class
         Optimizer = self.params['train']['optimizer_class']
@@ -263,8 +258,8 @@ class LearningProcess:
         # Instantiate optimizer, scheduler and loss.
         optimizer = Optimizer(self.net.parameters(), **self.params['train']['optimizer'])
         scheduler = Scheduler(optimizer, **self.params['train']['scheduler'])
-        criterion = Loss(**self.params['train']['loss'])
         dataloader = DataLoader(dataset_train, **self.params['train']['dataloader'])
+        criterion = Loss(self.params)
 
         # remaining training parameters
         freq_val = self.params['train']['freq_val']
@@ -283,9 +278,9 @@ class LearningProcess:
         #     scheduler.step(epoch)
 
         # Training Loop
-        loss, best_loss = torch.Tensor([0.0]), torch.Tensor([10000.0])
+        loss, best_loss = torch.Tensor([10000.0]), torch.Tensor([10000.0])
         for epoch in range(1, n_epochs + 1):
-            print('Epoch %d' % epoch)
+            print('\n# Epoch %d' % epoch)
             loss_epoch = self.loop_train(dataloader, optimizer, criterion)
             writer.add_scalar('loss/train', loss_epoch.item(), epoch)
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
@@ -311,13 +306,13 @@ class LearningProcess:
                 writer.add_scalar('loss/val', loss.item(), epoch)
                 start_time = time.time()
             elif epoch % (freq_val//5) == 0:
-                cprint('Epoch %4d Loss(train) %.4f' % (epoch, loss_epoch), 'grey')
+                print('Epoch %4d Loss(train) %.4f' % (epoch, loss_epoch))
 
 
         cprint('\n  Train is over  \n', 'cyan', attrs=['bold'])
 
         cprint('Testing ... ', 'green')
-        dataset_test = DGADataset(**self.params['dataset'], mode='test')
+        dataset_test = DGADataset(self.params, 'test')
         weights = torch.load(self.weight_path)
         self.net.load_state_dict(weights)
         self.net.cuda()
@@ -335,8 +330,8 @@ class LearningProcess:
     def test(self):
         """test a network once training is over"""
         Loss = self.params['train']['loss_class']
-        criterion = Loss(**self.params['train']['loss'])
-        dataset_test = DGADataset(**self.params['dataset'], mode='test')
+        criterion = Loss(self.params)
+        dataset_test = DGADataset(self.params, 'test')
 
         if not os.path.exists(self.params['test_dir']):
             os.makedirs(self.params['test_dir'])
@@ -346,79 +341,80 @@ class LearningProcess:
         print('  --success')
 
     def analyze(self):
-        dataset_test = DGADataset(**self.params['dataset'], mode='test')
-
+        dataset_test = DGADataset(self.params, 'test')
 
         for i, seq in enumerate(dataset_test.sequences):
             self.seq = seq
             if not os.path.exists(os.path.join(self.params['result_dir'], seq)):
                 os.mkdir(os.path.join(self.params['result_dir'], seq))
             cprint('On %s ... ' % seq, 'green', end='')
-            us, dxi_ij, delta_v_gt, gt_interpolated, vs_gt_norm = dataset_test[i]
-            # print('  us: ', us.shape)
-            # print('  dxi_ij: ', dxi_ij.shape)
-            # print('  delta_v_gt: ', delta_v_gt.shape)
-            # print('  gt_interpolated: ', gt_interpolated.shape)
 
-            pos_gt = gt_interpolated[:, 1:4]
-            quat_gt = gt_interpolated[:, 4:8]
-            vel_gt = gt_interpolated[:, 8:11]
-            # print('  pos_gt: ', pos_gt.shape)
-            # print('  quat_gt: ', quat_gt.shape)
-            # print('  vel_gt: ', vel_gt.shape)
+            ## LOAD DATA
+            seq, us, gt, dw_16, dv_normed = dataset_test[i]
+            us = us.cpu()
+            gt = gt.cpu()
+            dw_16 = dw_16.cpu()
+            for w in dv_normed:
+                dv_normed[w] = dv_normed[w].cpu()
 
+            pos_gt = gt[:, 1:4]
+            quat_gt = gt[:, 4:8]
+            vel_gt = gt[:, 8:11]
 
             mondict = pload(self.params['result_dir'], 'tests', 'results_%s.p'%seq)
             w_hat = mondict['w_hat']
             a_hat = mondict['a_hat']
-            loss = mondict['loss']
-            # print('  w_hat: ', w_hat.shape)
-            # print('  a_hat: ', a_hat.shape)
+            loss = mondict['loss'] # float
+            self.ts = torch.linspace(0, N * self.dt, N)
 
+            ## Analyze Orientation
             N = us.shape[0]
             rot_gt = SO3.from_quaternion(quat_gt.cuda()).cpu()
             rpy_gt = SO3.to_rpy(rot_gt.cuda()).cpu()
-            self.ts = torch.linspace(0, N * self.dt, N)
 
             def rad2deg(x):
                 return x * (180. / np.pi)
 
-            quat_hat, rot_imu, rot_hat = self.integrate_with_quaternions_superfast(dxi_ij.shape[0], us, w_hat, quat_gt)
+            quat_hat, rot_imu, rot_hat = self.integrate_with_quaternions_superfast(dw_16.shape[0], us, w_hat, quat_gt)
             rpy_imu = SO3.to_rpy(rot_imu).cpu()
             rpy_hat = SO3.to_rpy(rot_hat).cpu()
             self.plot_orientation(N, rad2deg(rpy_imu), rad2deg(rpy_hat), rad2deg(rpy_gt))
             self.plot_orientation_error(N, rot_imu, rot_hat, rot_gt)
 
             gyro_corrections  =  (us[:, :3]  - w_hat[:N, :])
+            self.plot_gyro_correction(gyro_corrections)
 
-            rot_gt = SO3.from_quaternion(quat_gt.cuda()).cpu()
+            print('- rot_gt:', rot_gt.shape)
             rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
             a_w = bmv(rot_gt, us[:, 3:6]) - torch.Tensor([0., 0., 9.81])
             accel_corrections =  (a_w - a_hat)
-            self.plot_gyro_correction(gyro_corrections)
             self.plot_accel_correction(accel_corrections)
 
-            self.plot_accel(a_hat, gt_interpolated)
+            self.plot_accel(a_hat, gt)
 
             cprint('[ok]\n', 'blue')
-
-
-        # self.display_test(dataset_test)
 
     def loop_train(self, dataloader, optimizer, criterion):
         """Forward-backward loop over training data"""
         loss_epoch = 0
         optimizer.zero_grad()
-        for us, xs, dv, gt, vs_gt_norm in dataloader:
-            us = dataloader.dataset.add_noise(us.cuda()) # torch.Size([6, 16000, 6])
+        for seq, us, gt, dw_16, dv_normed in dataloader:
+            us = dataloader.dataset.add_noise(us)
+            # print('  us:', us.shape, us.dtype, us.device)
             q_gt = gt[:, :, 4:8].reshape(-1, 4)
             rot_gt = SO3.from_quaternion(q_gt.cuda())
             rot_gt = rot_gt.reshape(us.shape[0], us.shape[1], 3, 3)
 
             w_hat, a_hat = self.net(us, rot_gt)
-            loss = criterion(w_hat, a_hat, xs.cuda(), dv.cuda(), vs_gt_norm.cuda())/len(dataloader)
+            loss = criterion(w_hat, dw_16, a_hat, dv_normed)/len(dataloader)
             loss.backward()
+
+            # for name, param in self.net.named_parameters():
+            #     if param.grad is not None:
+            #         print(name, torch.isfinite(param.grad).all())
+
             loss_epoch += loss.detach().cpu()
+            # print('train_loss:', loss.detach().cpu().item())
         optimizer.step()
         return loss_epoch
 
@@ -428,13 +424,15 @@ class LearningProcess:
         self.net.eval()
         with torch.no_grad():
             for i in range(len(dataset)):
-                us, xs, dv, gt, vs_gt_norm = dataset[i]
+                seq, us, gt, dw_16, dv_normed = dataset[i]
                 q_gt = gt[:, 4:8]
                 rot_gt = SO3.from_quaternion(q_gt.cuda())
                 rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
 
-                w_hat, a_hat = self.net(us.cuda().unsqueeze(0), rot_gt.cuda().unsqueeze(0), 'val')
-                loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0), vs_gt_norm.cuda().unsqueeze(0), 'val')/len(dataset)
+                w_hat, a_hat = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0))
+                for key in dv_normed:
+                    dv_normed[key] = dv_normed[key].unsqueeze(0)
+                loss = criterion(w_hat, dw_16.unsqueeze(0), a_hat, dv_normed)/len(dataset)
                 loss_epoch += loss.cpu()
         self.net.train()
         return loss_epoch
@@ -444,8 +442,7 @@ class LearningProcess:
         self.net.eval()
 
         for i in range(len(dataset)):
-            seq = dataset.sequences[i]
-            us, xs, dv, gt, vs_gt_norm = dataset[i]
+            seq, us, gt, dw_16, dv_normed = dataset[i]
             q_gt = gt[:, 4:8]
             rot_gt = SO3.from_quaternion(q_gt.cuda())
             rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
@@ -455,8 +452,11 @@ class LearningProcess:
             # print('  dv:', dv.shape)
 
             with torch.no_grad():
-                w_hat, a_hat = self.net(us.cuda().unsqueeze(0), rot_gt.cuda().unsqueeze(0))
-                loss = criterion(w_hat, a_hat, xs.cuda().unsqueeze(0), dv.cuda().unsqueeze(0), vs_gt_norm.cuda().unsqueeze(0))
+                w_hat, a_hat = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0))
+                for key in dv_normed:
+                    dv_normed[key] = dv_normed[key].unsqueeze(0)
+                loss = criterion(w_hat, dw_16.unsqueeze(0), a_hat, dv_normed)/len(dataset)
+
                 self.dict_test_result[seq] = {
                     'w_hat': w_hat[0].cpu(),
                     'a_hat': a_hat[0].cpu(),
@@ -484,55 +484,6 @@ class LearningProcess:
             torch.save(self.net.state_dict(), self.weight_path)
         self.net.train().cuda()
 
-    def display_test(self, dataset):
-
-        # self.to_open_vins(dataset)
-
-        for i, seq in enumerate(dataset.sequences):
-            print('  - %s  ' % seq, end='')
-
-            # Load
-            mondict = dataset.load_seq(i)
-            ts = mondict['ts']
-            us = mondict['us']
-            dxi_ij = mondict['dxi_ij']
-            gt_interpolated = mondict['gt_interpolated']
-            delta_v_gt = mondict['delta_v_gt']
-            pos_gt = gt_interpolated[:, 1:4]
-            quat_gt = gt_interpolated[:, 4:8]
-            vel_gt = gt_interpolated[:, 8:11]
-
-
-            rot_gt = SO3.from_quaternion(quat_gt.cuda()).cpu()
-            rpy_gt = SO3.to_rpy(rot_gt.cuda()).cpu()
-
-            # self.gt['Rots'] = Rots.cpu()
-            # self.gt['rpys'] = SO3.to_rpy(Rots).cpu()
-
-            # get data and estimate
-            mondict = pload(self.params['result_dir'], 'results_%s.p'%seq)
-            w_hat = mondict['w_hat']
-            a_hat = mondict['a_hat']
-            loss = mondict['loss']
-
-            self.raw_us, _, _, _ = dataset[i]
-
-            N = self.us.shape[0]
-            self.gyro_corrections  =  (us[:, :3]  - w_hat[:N, :])
-            self.accel_corrections =  (us[:, 3:6] - a_hat[:N, :])
-            self.ts = torch.linspace(0, N * self.dt, N)
-
-            def rad2deg(x):
-                return x * (180. / np.pi)
-
-            quat_hat, rot_imu, rot_hat = self.integrate_with_quaternions_superfast(N, us, w_hat)
-            imu_rpys = (180/np.pi)*SO3.to_rpy(rot_imu).cpu()
-            net_rpys = (180/np.pi)*SO3.to_rpy(rot_hat).cpu()
-
-            self.plot_orientation(imu_rpys, net_rpys, N)
-            self.plot_orientation_error(rot_imu, rot_hat, N)
-            self.plot_gyro_correction()
-            cprint('[ok]', 'blue')
 
     def save_gyro_estimate(self, seq):
         net_us = pload(self.params['result_dir'], seq, 'results.p')['hat_xs']
@@ -717,8 +668,6 @@ class LearningProcess:
         self.savefig(axs, fig, 'vel_estimate')
         plt.close(fig)
 
-
-
     def plot_orientation(self, N, rpy_imu, rpy_hat, rpy_gt):
         title = "Orientation estimation"
 
@@ -753,8 +702,8 @@ class LearningProcess:
         axs[2].set(xlabel='$t$ (min)', ylabel='yaw (deg)')
 
         for i in range(3):
-            axs[i].plot(self.ts, err_imu[:, i], color='red', label=r'raw IMU')
-            axs[i].plot(self.ts, err_hat[:, i], color='blue', label=r'net IMU')
+            axs[i].plot(self.ts, err_imu[:, i] % 360, color='red', label=r'raw IMU')
+            axs[i].plot(self.ts, err_hat[:, i] % 360, color='blue', label=r'net IMU')
             axs[i].set_xlim(self.ts[0], self.ts[-1])
 
         self.savefig(axs, fig, 'orientation_error')

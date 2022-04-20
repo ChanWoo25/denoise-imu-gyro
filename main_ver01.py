@@ -5,9 +5,8 @@ import torch
 
 from src.DGAProcess import LearningProcess
 
-from src.DGALossV2 import DGALoss
+from src.DGALoss import DGALoss
 from src.DGANet import DGANet
-from src.DGANetV2 import DGANetV2
 
 from termcolor import cprint
 
@@ -17,11 +16,13 @@ parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('--debug', type=bool, default=False)
 parser.add_argument('--mode', type=str, default='train')
 parser.add_argument('--id', type=str, default=None)
-parser.add_argument('-c', type=int, default=-1)
-parser.add_argument('--lr', type=float, default=-1.0)
-parser.add_argument('--v_windows', nargs='+', type=int, default=[64])
+parser.add_argument('--c0', type=int, default=16)
+parser.add_argument('--lr', type=float, default=0.01)
+parser.add_argument('--dv', nargs='+', type=int, default=[16, 32])
+parser.add_argument('--dv_normed', nargs='+', type=int, default=[32, 64])
 args = parser.parse_args()
 print(args.__dict__)
+
 
 params = {
     'debug': args.debug,
@@ -64,19 +65,19 @@ params = {
     'net': {
         'in_dim': 6,
         'out_dim': 6,
-        'c0': 16,
+        'c0': args.c0,
         'dropout': 0.1,
         'ks': [7, 7, 7, 7],
         'ds': [4, 4, 4],
         'momentum': 0.1,
         'gyro_std': [1*np.pi/180, 2*np.pi/180, 5*np.pi/180],
-        'acc_std': [2.0e-3, 2.0e-3, 2.0e-3],
+        'acc_std': [2.0e-3, 2.0e-3, 2.0e-3], #? Is this proper range ?#
     },
 
     'train': {
         'optimizer_class': torch.optim.Adam,
         'optimizer': {
-            'lr': 0.01,
+            'lr': args.lr,
             'weight_decay': 1e-1,
             'amsgrad': False,
         },
@@ -87,7 +88,8 @@ params = {
             'w':  1e6,
             'huber': 0.005,
             'dt': 0.005,
-            'v_windows': [64],
+            'dv': args.dv,
+            'dv_normed': args.dv_normed,
         },
         'scheduler_class': torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
         'scheduler': {
@@ -103,48 +105,24 @@ params = {
         },
 
         # frequency of validation step
-        'freq_val': 20,
+        'freq_val': 30,
         # total number of epochs
-        'n_epochs': 400,
+        'n_epochs': 600,
     }
 }
 
-# params['net_class'] = DGANetV2
-# params['net'] = {
-#     'in_dim':  6,
-#     'out_dim': 6,
-#     'channel': [32, 64, 64, 128, 128, 256],
-#     'kernal':  [5,  5,  5,  5,   5,   5],
-#     'dilation':[2,  4,  8,  16,   32,   64],
-#     'stride':  [1,  1,  1,  1,   1,   1],
-#     'momentum': 0.1,
-#     'gyro_std': [1*np.pi/180, 2*np.pi/180, 5*np.pi/180],
-#     'acc_std': [2.0e-3, 2.0e-3, 2.0e-3],
-# }
-
 if __name__ == '__main__':
-    if args.c >= 0:
-        params['net']['c0'] = args.c
-        cprint('Note :: params/net/c0 = %d' % args.c, 'green')
-    if args.lr >= 0:
-        params['train']['optimizer']['lr'] = args.lr
-        cprint('Note :: params/train/optimizer/lr = %d' % args.lr, 'green')
-    if args.v_windows != [64]:
-        params['train']['loss']['v_windows'] = args.v_windows
-        params['dataset']['v_windows'] = args.v_windows
-        cprint('Note :: params/train/loss/v_windows = ' + str(args.v_windows), 'green')
 
     process = LearningProcess(params, args.mode)
 
-
-    # if args.mode == 'train':
-    #     cprint('\n========== Train ==========\n', 'cyan', attrs=['bold'])
-    #     process.train()
-    # elif args.mode == 'test':
-    #     cprint('\n========== Test ==========\n', 'cyan', attrs=['bold'])
-    #     process.test()
-    # elif args.mode == 'anal':
-    #     cprint('\n========== Analysis ==========\n', 'cyan', attrs=['bold'])
-    #     process.analyze()
-    # else:
-    #     cprint("argument 'mode' must be one of ['train', 'test', 'anal']", 'red')
+    if args.mode == 'train':
+        cprint('\n========== Train ==========\n', 'cyan', attrs=['bold'])
+        process.train()
+    elif args.mode == 'test':
+        cprint('\n========== Test ==========\n', 'cyan', attrs=['bold'])
+        process.test()
+    elif args.mode == 'anal':
+        cprint('\n========== Analysis ==========\n', 'cyan', attrs=['bold'])
+        process.analyze()
+    else:
+        cprint("argument 'mode' must be one of ['train', 'test', 'anal']", 'red')
