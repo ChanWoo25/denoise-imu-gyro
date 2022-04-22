@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from src.utils import bmmt, bmv, bmtv, bbmv, bmtm
+from src.utils import bmtm, vnorm, fast_acc_integration
 from src.lie_algebra import SO3
 
 class DGALoss(torch.nn.Module):
@@ -37,7 +37,7 @@ class DGALoss(torch.nn.Module):
 
     def gyro_loss(self, w_hat, dw_16):
         """Forward errors with rotation matrices"""
-        print('# GYRO LOSS:')
+        # print('# GYRO LOSS:')
         N = dw_16.shape[0]
         drot_16 = SO3.exp(dw_16[:, ::self.min_train_freq].reshape(-1, 3).double())
         # print('- dw_16:', dw_16.shape, dw_16.shape, dw_16.device)
@@ -65,13 +65,14 @@ class DGALoss(torch.nn.Module):
             gyro_loss_32 = self.f_huber(rs)/(2**(k - self.min_N + 1))
         ###
 
-        print('- gyro loss 16:', gyro_loss_16)
-        print('- gyro loss 32:', gyro_loss_32)
+        # print('- gyro loss 16:', gyro_loss_16)
+        # print('- gyro loss 32:', gyro_loss_32)
         return gyro_loss_16 + gyro_loss_32
 
     def accel_loss(self, a_hat, gt_dv_normed):
-        print('# ACCEL LOSS')
-        dv_hat = (( (a_hat[:, 1:] + a_hat[:, :-1]) / 2.0) * self.dt)
+        # print('# ACCEL LOSS')
+        v_hat = fast_acc_integration(a_hat) # torch.Size([6, 16000, 3]) True cuda:0
+        # dv_hat = (( (a_hat[:, 1:] + a_hat[:, :-1]) / 2.0) * self.dt)
         # print('dv_hat:', dv_hat.shape, dv_hat.requires_grad)
 
 
@@ -126,33 +127,31 @@ class DGALoss(torch.nn.Module):
         # print()
 
         loss = torch.tensor(0.0, requires_grad=True).cuda()
+
         for key in gt_dv_normed_keys:
             window_size = key
-            # print('\nnormed window_size:', window_size)
-            padding_size = key - 1
             gt_normed_v = gt_dv_normed[str(key)].detach().cuda()
-            # print('- gt_normed_v:', gt_normed_v.shape, gt_normed_v.dtype, gt_normed_v.device)
 
-            # Integration
-            v_hat = dv_hat.clone().cuda()
-            # print('- v_hat:', v_hat.shape, v_hat.dtype, v_hat.device, v_hat.requires_grad)
-            for i in range(1, v_hat.shape[1]):
-                v_hat[:, i, :] += v_hat[:, i-1, :]
+            ## Integration
+            # v_hat = dv_hat.clone().cuda()
+            # # print('- v_hat:', v_hat.shape, v_hat.dtype, v_hat.device, v_hat.requires_grad)
+            # for i in range(1, v_hat.shape[1]):
+            #     v_hat[:, i, :] += v_hat[:, i-1, :]
 
-            _mean = torch.zeros(v_hat.shape[0], 1, v_hat.shape[2]).cuda()
-            for i in range(v_hat.shape[1]):
-                i0 = max(0, i+1-window_size)
-                iN = i+1
-                _mean = torch.cat([_mean, v_hat[:, i0:iN, :].mean(dim=1, keepdim=True)], dim=1)
-            # print('- _mean:', _mean.shape, _mean.dtype, _mean.device)
+            normed_v = vnorm(v_hat, window_size)
 
-            v_hat = torch.cat([torch.zeros(v_hat.shape[0], 1, v_hat.shape[2]).cuda(), v_hat], dim=1)
-            normed_v = v_hat - _mean
+            # _mean = torch.zeros(v_hat.shape[0], 1, v_hat.shape[2]).cuda()
+            # for i in range(v_hat.shape[1]):
+            #     i0 = max(0, i+1-window_size)
+            #     iN = i+1
+            #     _mean = torch.cat([_mean, v_hat[:, i0:iN, :].mean(dim=1, keepdim=True)], dim=1)
+            # v_hat = torch.cat([torch.zeros(v_hat.shape[0], 1, v_hat.shape[2]).cuda(), v_hat], dim=1)
+            # normed_v = v_hat - _mean
 
-            _loss = self.sln(gt_normed_v, normed_v) * window_size * 10
+            _loss = self.sln(gt_normed_v, normed_v) * np.log(window_size) * 10.0
             _loss = _loss.mean(dim=1).sum()
             loss += _loss
-            print('- accel loss %d:' % window_size, _loss)
+            # print('- accel loss %d:' % window_size, _loss)
 
             # est_normed_v = torch.cat([v_hat[:, 0, :].unsqueeze(1).expand(batch_size, padding_size, 3), v_hat], dim=1)
             # print('- est_normed_v:', est_normed_v.shape, est_normed_v.requires_grad)

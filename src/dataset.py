@@ -4,7 +4,7 @@ if sys.platform.startswith('win'):
 elif sys.platform.startswith('linux'):
     sys.path.append('/root/denoise')
 
-from src.utils import pdump, , bmtv, bmtm
+from src.utils import pdump, bmtv, bmtm
 from src.lie_algebra import SO3
 from termcolor import cprint
 from torch.utils.data.dataset import Dataset

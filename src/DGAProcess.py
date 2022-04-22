@@ -16,8 +16,9 @@ import numpy as np
 import os
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
-from src.utils import pload, pdump, yload, ydump, mkdir, bmv
-from src.utils import bmtm, bmtv, bmmt, bbmv
+
+from src.utils import pload, pdump, yload, ydump, mkdir
+from src.utils import bmtm, bmv, vnorm, fast_acc_integration
 
 
 from src.lie_algebra import SO3
@@ -37,6 +38,7 @@ class LearningProcess:
         self.dict_test_result = {}
         self.figsize = (20, 12)
         self.dt = 0.005 # (s)
+        self.id = params['id']
 
         self.preprocess()
 
@@ -61,8 +63,9 @@ class LearningProcess:
         print('\n# Preprocess ... ')
         all_seqs = [*self.params['dataset']['train_seqs'], *self.params['dataset']['test_seqs']]
         all_seqs.sort()
+        dt = 0.005
         dv_windows = [16, 32, 64] #
-        dv_normed_windows = [32, 64, 128, 256, 512] #
+        dv_normed_windows = [16, 32, 64, 128, 256, 512] #
 
         for seq in all_seqs:
             _seq_dir = os.path.join(self.params['dataset']['predata_dir'], seq)
@@ -134,12 +137,17 @@ class LearningProcess:
             imu = torch.Tensor(imu).double()
             gt_interpolated = torch.Tensor(gt_interpolated)
 
+            # take pseudo ground truth accerelation
+            a_gt = v_gt[1:] + v_gt[:-1] / dt
+            a_gt = torch.cat([a_gt[0].unsqueeze(0), (a_gt[1:] + a_gt[:-1]) / 2.0, a_gt[-1].unsqueeze(0)])
+
             # compute pre-integration factors for all training
             mtf = self.params['dataset']['min_train_freq']
             dRot_ij = bmtm(Rot_gt[:-mtf], Rot_gt[mtf:])
             dRot_ij = SO3.dnormalize(dRot_ij.cuda())
             dxi_ij = SO3.log(dRot_ij).cpu()
             # print("\tdxi_ij -- ", dxi_ij.shape, dxi_ij.dtype) # [29976, 3]
+
 
             ## COMPUTE gt_dv, gt_dv_normed
             v_gt = v_gt.cuda() # torch.Size([N, 3]) torch.float64 cuda:0
@@ -188,7 +196,9 @@ class LearningProcess:
             _gt_path = os.path.join(_seq_dir, 'gt.pt')
             _gt_dict = {
                 'gt_interpolated': gt_interpolated.float(),
-                'dw_16': dxi_ij.float()} # the 16-size window's euler angle difference
+                'dw_16': dxi_ij.float(), # the 16-size window's euler angle difference
+                'a_gt': a_gt.float(),
+            }
             torch.save(_gt_dict, _gt_path)
 
             _gt_dv_path = os.path.join(_seq_dir, 'dv.pt')
@@ -199,6 +209,7 @@ class LearningProcess:
                     '64': _gt_dv['64'].float(),
                 },
                 'dv_normed': {
+                    '16':   _gt_dv_normed['16'].float(),
                     '32':   _gt_dv_normed['32'].float(),
                     '64':   _gt_dv_normed['64'].float(),
                     '128':  _gt_dv_normed['128'].float(),
@@ -280,7 +291,6 @@ class LearningProcess:
         # Training Loop
         loss, best_loss = torch.Tensor([10000.0]), torch.Tensor([10000.0])
         for epoch in range(1, n_epochs + 1):
-            print('\n# Epoch %d' % epoch)
             loss_epoch = self.loop_train(dataloader, optimizer, criterion)
             writer.add_scalar('loss/train', loss_epoch.item(), epoch)
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
@@ -305,7 +315,7 @@ class LearningProcess:
 
                 writer.add_scalar('loss/val', loss.item(), epoch)
                 start_time = time.time()
-            elif epoch % (freq_val//5) == 0:
+            elif epoch % (freq_val//4) == 0:
                 print('Epoch %4d Loss(train) %.4f' % (epoch, loss_epoch))
 
 
@@ -344,13 +354,14 @@ class LearningProcess:
         dataset_test = DGADataset(self.params, 'test')
 
         for i, seq in enumerate(dataset_test.sequences):
+            cprint('\n# Visualze results on %s ... ' % seq, 'green')
+
             self.seq = seq
             if not os.path.exists(os.path.join(self.params['result_dir'], seq)):
                 os.mkdir(os.path.join(self.params['result_dir'], seq))
-            cprint('On %s ... ' % seq, 'green', end='')
 
             ## LOAD DATA
-            seq, us, gt, dw_16, dv_normed = dataset_test[i]
+            seq, us, gt, dw_16, a_gt, dv_normed = dataset_test[i]
             us = us.cpu()
             gt = gt.cpu()
             dw_16 = dw_16.cpu()
@@ -365,10 +376,10 @@ class LearningProcess:
             w_hat = mondict['w_hat']
             a_hat = mondict['a_hat']
             loss = mondict['loss'] # float
-            self.ts = torch.linspace(0, N * self.dt, N)
 
             ## Analyze Orientation
             N = us.shape[0]
+            self.ts = torch.linspace(0, N * self.dt, N)
             rot_gt = SO3.from_quaternion(quat_gt.cuda()).cpu()
             rpy_gt = SO3.to_rpy(rot_gt.cuda()).cpu()
 
@@ -384,21 +395,33 @@ class LearningProcess:
             gyro_corrections  =  (us[:, :3]  - w_hat[:N, :])
             self.plot_gyro_correction(gyro_corrections)
 
-            print('- rot_gt:', rot_gt.shape)
-            rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
-            a_w = bmv(rot_gt, us[:, 3:6]) - torch.Tensor([0., 0., 9.81])
-            accel_corrections =  (a_w - a_hat)
+            ## Analyze Acceleration
+            v_hat = fast_acc_integration(a_hat.unsqueeze(0)).squeeze()
+            v_gt = vel_gt - vel_gt[0].expand_as(vel_gt)
+            self.plot_velocity(v_hat, v_gt)
+            ## correction
+            rot_gt = rot_gt.reshape(us.shape[0], 3, 3) # [N, 3, 3]
+            a_raw = bmv(rot_gt, us[:, 3:6]) - torch.Tensor([0., 0., 9.81])
+            accel_corrections =  (a_raw - a_hat)
             self.plot_accel_correction(accel_corrections)
+            ## nomred
+            for window in self.params['train']['loss']['dv_normed']:
+                v_raw = fast_acc_integration(a_raw.unsqueeze(0)).squeeze()
+                v_normed_raw = vnorm(v_raw.unsqueeze(0), window_size=window).squeeze()
+                v_normed_hat = vnorm(v_hat.unsqueeze(0), window_size=window).squeeze()
+                v_normed_gt  = vnorm(v_gt.unsqueeze(0),  window_size=window).squeeze()
+                self.plot_v_normed(v_normed_raw, v_normed_hat, v_normed_gt, window)
+            # self.plot_accel(a_hat, gt)
 
-            self.plot_accel(a_hat, gt)
+            print('--- success ---')
 
-            cprint('[ok]\n', 'blue')
+
 
     def loop_train(self, dataloader, optimizer, criterion):
         """Forward-backward loop over training data"""
         loss_epoch = 0
         optimizer.zero_grad()
-        for seq, us, gt, dw_16, dv_normed in dataloader:
+        for seq, us, gt, dw_16, a_gt, dv_normed in dataloader:
             us = dataloader.dataset.add_noise(us)
             # print('  us:', us.shape, us.dtype, us.device)
             q_gt = gt[:, :, 4:8].reshape(-1, 4)
@@ -424,7 +447,7 @@ class LearningProcess:
         self.net.eval()
         with torch.no_grad():
             for i in range(len(dataset)):
-                seq, us, gt, dw_16, dv_normed = dataset[i]
+                seq, us, gt, dw_16, a_gt, dv_normed = dataset[i]
                 q_gt = gt[:, 4:8]
                 rot_gt = SO3.from_quaternion(q_gt.cuda())
                 rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
@@ -442,7 +465,7 @@ class LearningProcess:
         self.net.eval()
 
         for i in range(len(dataset)):
-            seq, us, gt, dw_16, dv_normed = dataset[i]
+            seq, us, gt, dw_16, a_gt, dv_normed = dataset[i]
             q_gt = gt[:, 4:8]
             rot_gt = SO3.from_quaternion(q_gt.cuda())
             rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
@@ -581,8 +604,8 @@ class LearningProcess:
             print("net imu rpy is saved in \'%s\'" % net_rpys_path)
 
     def integrate_with_quaternions_superfast(self, N, raw_us, net_us, quat_gt):
-        imu_qs = SO3.qnorm(SO3.qexp(raw_us[:, :3].cuda().double()*self.dt))
-        net_qs = SO3.qnorm(SO3.qexp(net_us[:, :3].cuda().double()*self.dt))
+        imu_qs = SO3.qnorm(SO3.qexp(raw_us[:, :3].cuda().double() * self.dt))
+        net_qs = SO3.qnorm(SO3.qexp(net_us[:, :3].cuda().double() * self.dt))
         Rot0 = SO3.qnorm(quat_gt[:2].cuda().double())
         imu_qs[0] = Rot0[0]
         net_qs[0] = Rot0[0]
@@ -615,8 +638,63 @@ class LearningProcess:
         net_qs, imu_Rots, net_Rots = self.integrate_with_quaternions_superfast(N, raw_us, net_us)
         imu_rpys = (180/np.pi)*SO3.to_rpy(imu_Rots).cpu()
         net_rpys = (180/np.pi)*SO3.to_rpy(net_Rots).cpu()
+
         self.plot_orientation(imu_rpys, net_rpys, N)
         self.plot_orientation_error(imu_Rots, net_Rots, N)
+
+    def plot_velocity(self, v_hat, v_gt):
+        fig, ax = plt.subplots(nrows=3, ncols=1, figsize=self.figsize, dpi=250)
+        fig.suptitle('Velocity / %s / %s' % (self.seq, self.id), fontsize=20)
+
+        ax[0].plot(self.ts, v_hat[:, 0], 'g', label="Est. vel(x)")
+        ax[0].plot(self.ts, v_gt[:, 0],  'r', label="GT.  vel(x)")
+        ax[0].set_title('Velocity - X')
+        ax[0].legend(loc='best')
+        ax[1].plot(self.ts, v_hat[:, 1], 'g', label="Est. vel(y)")
+        ax[1].plot(self.ts, v_gt[:, 1],  'r', label="GT.  vel(y)")
+        ax[1].set_title('Velocity - Y')
+        ax[1].legend(loc='best')
+        ax[2].plot(self.ts, v_hat[:, 2], 'g', label="Est. vel(z)")
+        ax[2].plot(self.ts, v_gt[:, 2],  'r', label="GT.  vel(z)")
+        ax[2].set_title('Velocity - Z')
+        ax[2].legend(loc='best')
+
+        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'velocity')
+        _path = os.path.join(_dir, self.id + '.png')
+        if not os.path.exists(_dir):
+            os.makedirs(_dir)
+        self.savefig(ax, fig, _path)
+        plt.close(fig)
+
+    def plot_v_normed(self, v_normed_raw, v_normed_hat, v_normed_gt, window_size):
+        fig, ax = plt.subplots(nrows=3, ncols=1, figsize=self.figsize, dpi=250)
+        fig.suptitle('Normalized Velocity / %s / %s / window(%d)' % (self.seq, self.id, window_size), fontsize=20)
+
+        ax[0].plot(self.ts, v_normed_raw[:, 0], 'b', alpha = 0.5, label="Raw. vel(x)")
+        ax[0].plot(self.ts, v_normed_hat[:, 0], 'g', alpha = 0.5, label="Est. vel(x)")
+        ax[0].plot(self.ts, v_normed_gt[:, 0],  'r', alpha = 0.5, label="GT.  vel(x)")
+        ax[0].set_title('Vel_normed - X')
+        ax[0].legend(loc='best')
+
+        ax[1].plot(self.ts, v_normed_raw[:, 1], 'b', alpha = 0.5, label="Raw. vel(y)")
+        ax[1].plot(self.ts, v_normed_hat[:, 1], 'g', alpha = 0.5, label="Est. vel(y)")
+        ax[1].plot(self.ts, v_normed_gt[:, 1],  'r', alpha = 0.5, label="GT.  vel(y)")
+        ax[1].set_title('Vel_normed - Y')
+        ax[1].legend(loc='best')
+
+        ax[2].plot(self.ts, v_normed_raw[:, 2], 'b', alpha = 0.5, label="Raw. vel(z)")
+        ax[2].plot(self.ts, v_normed_hat[:, 2], 'g', alpha = 0.5, label="Est. vel(z)")
+        ax[2].plot(self.ts, v_normed_gt[:, 2],  'r', alpha = 0.5, label="GT.  vel(z)")
+        ax[2].set_title('Vel_normed - Z')
+        ax[2].legend(loc='best')
+
+        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'normed_vel_w%d' % window_size)
+        _path = os.path.join(_dir, self.id + '.png')
+        if not os.path.exists(_dir):
+            os.makedirs(_dir)
+        self.savefig(ax, fig, _path)
+        plt.close(fig)
+
 
     def plot_accel(self, a_hat, gt_interpolated):
 
@@ -669,46 +747,50 @@ class LearningProcess:
         plt.close(fig)
 
     def plot_orientation(self, N, rpy_imu, rpy_hat, rpy_gt):
-        title = "Orientation estimation"
+        fig, axs = plt.subplots(3, 1, sharex=True, figsize=self.figsize, dpi=250)
+        fig.suptitle('$SO(3)$ Orientation Estimation / %s / %s' % (self.seq, self.id), fontsize=20)
 
-        # print("rpy_imu:", rpy_imu.shape, rpy_imu.dtype)
-        # print("rpy_hat:", rpy_hat.shape, rpy_hat.dtype)
-        # print("rpy_gt:", rpy_gt.shape, rpy_gt.dtype)
-
-        rpy_gt = rpy_gt[:N]
-
-        fig, axs = plt.subplots(3, 1, sharex=True, figsize=self.figsize)
-        axs[0].set(ylabel='roll (deg)', title=title)
+        axs[0].set(ylabel='roll (deg)', title='Orientation estimation')
         axs[1].set(ylabel='pitch (deg)')
         axs[2].set(xlabel='$t$ (min)', ylabel='yaw (deg)')
 
+        rpy_gt = rpy_gt[:N]
         for i in range(3):
             # axs[i].plot(self.ts, rpy_imu[:, i]%360, color='red', label=r'raw IMU')
             axs[i].plot(self.ts, rpy_hat[:, i]%360, color='blue', label=r'net IMU')
             axs[i].plot(self.ts, rpy_gt[:, i]%360, color='black', label=r'ground truth')
             axs[i].set_xlim(self.ts[0], self.ts[-1])
 
-        self.savefig(axs, fig, 'orientation')
+        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'orientation')
+        _path = os.path.join(_dir, self.id + '.png')
+        if not os.path.exists(_dir):
+            os.makedirs(_dir)
+        self.savefig(axs, fig, _path)
         plt.close(fig)
 
     def plot_orientation_error(self, N, rot_imu, rot_hat, rot_gt):
+        fig, axs = plt.subplots(3, 1, sharex=True, figsize=self.figsize, dpi=250)
+        fig.suptitle('$SO(3)$ Orientation Error / %s / %s' % (self.seq, self.id), fontsize=20)
+
+        axs[0].set(ylabel='roll (deg)', title='$SO(3)$ orientation error')
+        axs[1].set(ylabel='pitch (deg)')
+        axs[2].set(xlabel='$t$ (min)', ylabel='yaw (deg)')
+
         rot_gt = rot_gt[:N].cuda()
         err_imu = (180/np.pi)*SO3.log(bmtm(rot_imu, rot_gt)).cpu()
         err_hat = (180/np.pi)*SO3.log(bmtm(rot_hat, rot_gt)).cpu()
-        title = "$SO(3)$ orientation error"
-        fig, axs = plt.subplots(3, 1, sharex=True, figsize=self.figsize)
-        axs[0].set(ylabel='roll (deg)', title=title)
-        axs[1].set(ylabel='pitch (deg)')
-        axs[2].set(xlabel='$t$ (min)', ylabel='yaw (deg)')
 
         for i in range(3):
             axs[i].plot(self.ts, err_imu[:, i] % 360, color='red', label=r'raw IMU')
             axs[i].plot(self.ts, err_hat[:, i] % 360, color='blue', label=r'net IMU')
             axs[i].set_xlim(self.ts[0], self.ts[-1])
 
-        self.savefig(axs, fig, 'orientation_error')
+        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'orientation_error')
+        _path = os.path.join(_dir, self.id + '.png')
+        if not os.path.exists(_dir):
+            os.makedirs(_dir)
+        self.savefig(axs, fig, _path)
         plt.close(fig)
-
 
     # def plot_accel(self, a_hat, dv_gt, dp_gt):
     #     N = self.raw_us.shape[0]
@@ -729,34 +811,38 @@ class LearningProcess:
 
 
     def plot_gyro_correction(self, gyro_corrections):
-        title = "Gyro correction" + self.end_title
-        ylabel = 'gyro correction (deg/s)'
-        fig, ax = plt.subplots(figsize=self.figsize)
-        ax.set(xlabel='$t$ (min)', ylabel=ylabel, title=title)
+        fig, ax = plt.subplots(figsize=self.figsize, dpi=250)
+        fig.suptitle('Gyro Correction / %s / %s' % (self.seq, self.id), fontsize=20)
+
+        ax.set(xlabel='$t$ (min)', ylabel='gyro correction (deg/s)')
         plt.plot(self.ts, gyro_corrections[:, 0], label='correction of $w_x$')
         plt.plot(self.ts, gyro_corrections[:, 1], label='correction of $w_y$')
         plt.plot(self.ts, gyro_corrections[:, 2], label='correction of $w_z$')
 
-        self.savefig(ax, fig, 'gyro_correction')
+        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'gyro_correction')
+        _path = os.path.join(_dir, self.id + '.png')
+        if not os.path.exists(_dir):
+            os.makedirs(_dir)
+        self.savefig(ax, fig, _path)
         plt.close(fig)
 
     def plot_accel_correction(self, accel_corrections):
-        title = "Accel correction" + self.end_title
-        ylabel = 'accel correction ($m/s^2$)'
-        fig, ax = plt.subplots(figsize=self.figsize)
-        ax.set(xlabel='$t$ (min)', ylabel=ylabel, title=title)
+        fig, ax = plt.subplots(figsize=self.figsize, dpi=250)
+        fig.suptitle('Accel Correction / %s / %s'%(self.seq, self.id), fontsize=20)
+
+        ax.set(xlabel='$t$ (min)', ylabel='accel correction ($m/s^2$)', title='Accel correction')
         plt.plot(self.ts, accel_corrections[:, 0], label='correction of $a_x$')
         plt.plot(self.ts, accel_corrections[:, 1], label='correction of $a_y$')
         plt.plot(self.ts, accel_corrections[:, 2], label='correction of $a_z$')
 
-        self.savefig(ax, fig, 'accel_correction')
+        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'accel_correction')
+        _path = os.path.join(_dir, self.id + '.png')
+        if not os.path.exists(_dir):
+            os.makedirs(_dir)
+        self.savefig(ax, fig, _path)
         plt.close(fig)
 
-    @property
-    def end_title(self):
-        return " for sequence " + self.seq.replace("_", " ")
-
-    def savefig(self, axs, fig, name):
+    def savefig(self, axs, fig, path):
         if isinstance(axs, np.ndarray):
             for i in range(len(axs)):
                 axs[i].grid()
@@ -764,6 +850,5 @@ class LearningProcess:
         else:
             axs.grid()
             axs.legend()
-        fig.tight_layout()
-        fig.savefig(os.path.join(self.params['result_dir'], self.seq, name + '.png'))
+        fig.savefig(path)
 

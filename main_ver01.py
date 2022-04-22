@@ -28,6 +28,7 @@ params = {
     'debug': args.debug,
     'result_dir': os.path.join('/root/denoise/results', args.id),
     'test_dir': os.path.join('/root/denoise/results', args.id, 'tests'),
+    'id': args.id,
 
     'dataset': {
         'train_seqs': [
@@ -105,9 +106,9 @@ params = {
         },
 
         # frequency of validation step
-        'freq_val': 30,
+        'freq_val': 40,
         # total number of epochs
-        'n_epochs': 600,
+        'n_epochs': 1000,
     }
 }
 

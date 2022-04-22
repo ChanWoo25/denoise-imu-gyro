@@ -33,7 +33,6 @@ class DGADataset(Dataset):
         self.N              = params['dataset']['N']
         self.min_train_freq = params['dataset']['min_train_freq']
         self.max_train_freq = params['dataset']['max_train_freq']
-        self.dv             = params['train']['loss']['dv']
         self.dv_normed      = params['train']['loss']['dv_normed']
         self.mode = mode
         self.sequences = self.seq_dict[mode]
@@ -52,16 +51,17 @@ class DGADataset(Dataset):
         print('--- init success ---')
 
     def __getitem__(self, i):
-        seq   = self.sequences[i]
-        data  = torch.load(os.path.join(self.predata_dir, seq, 'data.pt'))
-        gt    = torch.load(os.path.join(self.predata_dir, seq, 'gt.pt'))
+        seq        = self.sequences[i]
+        data       = torch.load(os.path.join(self.predata_dir, seq, 'data.pt'))
+        gt_dict    = torch.load(os.path.join(self.predata_dir, seq, 'gt.pt'))
         gt_dv_dict = torch.load(os.path.join(self.predata_dir, seq, 'dv.pt'))
 
         ts = data['ts'].cuda()
         us = data['us'].cuda()
 
-        dw_16   = gt['dw_16'].cuda()
-        gt      = gt['gt_interpolated'].cuda()
+        dw_16   = gt_dict['dw_16'].cuda()
+        gt      = gt_dict['gt_interpolated'].cuda()
+        a_gt    = gt_dict['a_gt'].cuda()
 
         gt_dv_normed = gt_dv_dict['dv_normed']
 
@@ -83,6 +83,7 @@ class DGADataset(Dataset):
         us      = us[n0: nend]
         gt      = gt[n0: nend]
         dw_16   = dw_16[n0: nend]
+        a_gt    = a_gt[n0: nend]
         for key, value in gt_dv_normed.items():
             gt_dv_normed[key] = value[n0:nend]
 
@@ -93,7 +94,7 @@ class DGADataset(Dataset):
             for key, value in gt_dv_normed.items():
                 assert value.shape[0] == self.N
 
-        return seq, us, gt, dw_16, gt_dv_normed
+        return seq, us, gt, dw_16, a_gt, gt_dv_normed
 
     def __len__(self):
         return len(self.seq_dict[self.mode])
