@@ -1,4 +1,3 @@
-from cgi import parse_multipart
 import sys
 sys.path.append('/root/denoise')
 
@@ -138,8 +137,10 @@ class LearningProcess:
             gt_interpolated = torch.Tensor(gt_interpolated)
 
             # take pseudo ground truth accerelation
-            a_gt = v_gt[1:] + v_gt[:-1] / dt
+            print('v_gt:', v_gt.shape, v_gt.dtype, v_gt.device)
+            a_gt = (v_gt[1:] - v_gt[:-1]) / (dt)
             a_gt = torch.cat([a_gt[0].unsqueeze(0), (a_gt[1:] + a_gt[:-1]) / 2.0, a_gt[-1].unsqueeze(0)])
+            print('a_gt:', a_gt.shape, a_gt.dtype, a_gt.device)
 
             # compute pre-integration factors for all training
             mtf = self.params['dataset']['min_train_freq']
@@ -364,6 +365,7 @@ class LearningProcess:
             seq, us, gt, dw_16, a_gt, dv_normed = dataset_test[i]
             us = us.cpu()
             gt = gt.cpu()
+            a_gt = a_gt.cpu()
             dw_16 = dw_16.cpu()
             for w in dv_normed:
                 dv_normed[w] = dv_normed[w].cpu()
@@ -399,11 +401,13 @@ class LearningProcess:
             v_hat = fast_acc_integration(a_hat.unsqueeze(0)).squeeze()
             v_gt = vel_gt - vel_gt[0].expand_as(vel_gt)
             self.plot_velocity(v_hat, v_gt)
+
             ## correction
             rot_gt = rot_gt.reshape(us.shape[0], 3, 3) # [N, 3, 3]
             a_raw = bmv(rot_gt, us[:, 3:6]) - torch.Tensor([0., 0., 9.81])
             accel_corrections =  (a_raw - a_hat)
             self.plot_accel_correction(accel_corrections)
+
             ## nomred
             for window in self.params['train']['loss']['dv_normed']:
                 v_raw = fast_acc_integration(a_raw.unsqueeze(0)).squeeze()
@@ -411,7 +415,10 @@ class LearningProcess:
                 v_normed_hat = vnorm(v_hat.unsqueeze(0), window_size=window).squeeze()
                 v_normed_gt  = vnorm(v_gt.unsqueeze(0),  window_size=window).squeeze()
                 self.plot_v_normed(v_normed_raw, v_normed_hat, v_normed_gt, window)
-            # self.plot_accel(a_hat, gt)
+
+            ## Acceleration
+            self.plot_acceleration(a_raw, a_hat, a_gt)
+
 
             print('--- success ---')
 
@@ -641,6 +648,84 @@ class LearningProcess:
 
         self.plot_orientation(imu_rpys, net_rpys, N)
         self.plot_orientation_error(imu_Rots, net_Rots, N)
+
+    def plot_acceleration(self, a_raw, a_hat, a_gt):
+        if a_hat.shape[0] == 1:
+            a_hat = a_hat.squeeze()
+
+        assert a_hat.shape == a_gt.shape
+
+        #### DWT 신호처리로 분석해보려 했는데, 이해도 없이 그냥 돌리려니까 실패
+        # x_acc_hat = a_hat[:, 0]
+        # y_acc_hat = a_hat[:, 1]
+        # z_acc_hat = a_hat[:, 2]
+
+        # import pywt
+        # data = x_acc_hat.tolist()
+        # w = pywt.Wavelet('sym4')
+        # maxlev = pywt.dwt_max_level(len(data), w.dec_len)
+        # print("maximum level is %s" % str(maxlev))
+        # threshold = 0.04
+
+        # coeffs = pywt.wavedec(data, 'sym4', level=maxlev)
+        # fig, axs = plt.subplots(nrows=len(coeffs), ncols=1)
+        # for i in range(1, len(coeffs)):
+        #     axs[i].plot(coeffs[i], 'g', label="pre.acc(x)")
+        #     coeffs[i] = pywt.threshold(coeffs[i], threshold*max(coeffs[i]))
+        #     axs[i].plot(coeffs[i], 'b', label="post.acc(x)")
+
+        # _path = './%s_wave.png' % self.seq
+        # self.savefig(axs, fig, _path)
+        # plt.close(fig)
+
+        # datarec = pywt.waverec(coeffs, 'sym4')
+        # fig, axs = plt.subplots(nrows=2, ncols=1)
+        # axs[0].plot(self.ts, data)
+        # axs[0].set(xlabel='time (s)', ylabel='microvolts (uV)', title='Raw signal')
+
+        # axs[1].plot(self.ts, datarec)
+        # axs[1].set(xlabel='time (s)', ylabel='microvolts (uV)', title='De-noised signal using wavelet techniques')
+        # _path = './%s_wave2.png' % self.seq
+        # self.savefig(axs, fig, _path)
+        # plt.close(fig)
+        ####
+
+        fig, ax = plt.subplots(nrows=3, ncols=1, figsize=self.figsize, dpi=250)
+        fig.suptitle('Acceleration / %s / %s' % (self.seq, self.id), fontsize=20)
+
+        ax[0].plot(self.ts, a_raw[:, 0], 'k', label="Raw. acc(x)")
+        ax[0].plot(self.ts, a_hat[:, 0], 'g', label="Est. acc(x)")
+        ax[0].plot(self.ts, a_gt[:, 0],  'r', label="GT.  acc(x)")
+        ax[0].set_title('Accel - X')
+        ax[0].legend(loc='best')
+        ax[1].plot(self.ts, a_raw[:, 1], 'k', label="Raw. acc(y)")
+        ax[1].plot(self.ts, a_hat[:, 1], 'g', label="Est. acc(y)")
+        ax[1].plot(self.ts, a_gt[:, 1],  'r', label="GT.  acc(y)")
+        ax[1].set_title('Accel - Y')
+        ax[1].legend(loc='best')
+        ax[2].plot(self.ts, a_raw[:, 2], 'k', label="Raw. acc(z)")
+        ax[2].plot(self.ts, a_hat[:, 2], 'g', label="Est. acc(z)")
+        ax[2].plot(self.ts, a_gt[:, 2],  'r', label="GT.  acc(z)")
+        ax[2].set_title('Accel - Z')
+        ax[2].legend(loc='best')
+
+        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'acceleration')
+        _path = os.path.join(_dir, self.id + '.png')
+        if not os.path.exists(_dir):
+            os.makedirs(_dir)
+        self.savefig(ax, fig, _path)
+        plt.close(fig)
+
+        # Windowed version
+        # window_size = 9
+        # side = window_size // 2
+        # n = a_raw.shape[0]
+        # avg_a_raw = torch.zeros_like(a_raw)
+        # for i in range(-side, side+1):
+        #     avg_a_raw
+
+
+
 
     def plot_velocity(self, v_hat, v_gt):
         fig, ax = plt.subplots(nrows=3, ncols=1, figsize=self.figsize, dpi=250)
