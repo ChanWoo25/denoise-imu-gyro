@@ -13,7 +13,7 @@ def vnorm(velocity, window_size):
     v = velocity
     N = v.shape[1]
 
-    if v.dim() is not 3:
+    if v.dim() != 3:
         print("velocity's dim must be 3 for batch operation")
         exit(-1)
 
@@ -44,7 +44,7 @@ def fast_acc_integration(a_hat, dt=0.005):
         - data should have dimension 3.
     """
 
-    if a_hat.dim() is not 3:
+    if a_hat.dim() != 3:
         print("a_hat's dimension must be 3")
         exit(-1)
 

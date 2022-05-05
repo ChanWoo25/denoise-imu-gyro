@@ -157,12 +157,12 @@ class SO3:
         """Form a rotation matrix from a unit length quaternion.
         Valid orderings are 'xyzw' and 'wxyz'.
         """
-        if ordering is 'xyzw':
+        if ordering == 'xyzw':
             qx = quat[:, 0]
             qy = quat[:, 1]
             qz = quat[:, 2]
             qw = quat[:, 3]
-        elif ordering is 'wxyz':
+        elif ordering == 'wxyz':
             qw = quat[:, 0]
             qx = quat[:, 1]
             qy = quat[:, 2]
@@ -254,9 +254,9 @@ class SO3:
             qz[far_zero_inds] = (R_fz[:, 1, 0] - R_fz[:, 0, 1]) / d
 
         # Check ordering last
-        if ordering is 'xyzw':
+        if ordering == 'xyzw':
             quat = torch.stack([qx, qy, qz, qw], dim=1)
-        elif ordering is 'wxyz':
+        elif ordering == 'wxyz':
             quat = torch.stack([qw, qx, qy, qz], dim=1)
         return quat
 
