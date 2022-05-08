@@ -1,0 +1,64 @@
+5월 7일 6시 출근
+
+Optimizer에 기존에 적용되어 있는 Scheduler 적용
+기존에 val_loss가 0.1x? 정도까지 떨어졌었는데, 일단 이게 얼만큼 정성적인 결과가 나오는지
+확인부터 해야한다.
+현재는 Time window를 3200 까지 보고 있는데... 이게 얼마나 영향을 줄지는 모르겠다.
+DgaRawSequence 는 우선 CNN1D로 Feature를 뽑지 않고, 바로 네트워크에 센서값이 들어가는 구조이다.
+
+12 Epoch : loss=0.154, v_num=19, train_loss=0.190, val_loss=0.163]
+Epoch 124: loss=0.138, v_num=19, train_loss=0.109, val_loss=0.160][DgaRawSequence] -- forward()
+version 19 : lr = 0.01
+
+version 20 : lr = 0.001 200 epoch 훈련 val_loss 0.11 정도까지 내림
+
+
+version 28 : 511 window로 네트워크 돌린 다음 16 개의 Sensory로 시작하여 돌리는 경우
+val_loss 0.13 ~ 50 epoch
+val_loss 0.113 ~ 70 epoch
+
+version
+
+
+std, mean 실험: ode-solver 안의 Sigmoid가 bias와 std scaling을 포함하고 있기 때문에,
+엔지니어링이 필요하다고 판단.
+
+INPUT - std_mean: 1.0269081592559814 -0.0920419991016388
+STATE - std_mean: 0.37433379888534546 -0.04474993422627449
+>> Input의 std는 계속해서 증가하는 반면, 둘 모두 Mean 값은 살짝 음수인 것에서 벗어나지 않는 경향을 보였다.
+>> State의 std는 0.3~4정도로 유지됨
+평균치로 하는데도 INPUT이 계속 증가하는 것은 좀 문제가 있지 않나....??
+
+  "w": (0.001, 1.0),
+  "sigma": (2.0, 4.0),
+  "mu": (-0.1, 0.1),
+  "sensory_w": (0.001, 1.0),
+  "sensory_sigma": (0.8, 2.5),
+  "sensory_mu": (-0.1, 0.1),
+  위 정도로 이 부분은 마무리
+
+====================================================================
+[5월 8일]
+- DgaRawSequence로 전체 Batch 돌려서 얻은 결과가 은근히 대박... (대박 아님 ㅎㅎ 뻘쭘..)
+
+Epoch 303: [00:55<01:51, 55.74s/it, loss=0.0011, v_num=66, train_loss=0.000571, val_loss=0.00076]
+GPU available: True, used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name  | Type           | Params
+-----------------------------------------
+0 | model | DgaRawSequence | 5.3 K
+-----------------------------------------
+5.3 K     Trainable params
+0         Non-trainable params
+5.3 K     Total params
+0.021     Total estimated model params size (MB)
+
+- DgaWinSequence :
+Epoch 399: [03:20<00:00, 33.36s/it, loss=0.00598, v_num=63, train_loss=0.00465, val_loss=0.0044]
+
+Loss 변경하고, 우선 돌아가게 한 뒤에처음 돌린 버전: 79
+기록을 안 해놨더니 어느 정도 Loss까지 떨어져야 하는지 모르겠음...

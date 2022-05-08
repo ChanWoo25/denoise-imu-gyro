@@ -72,8 +72,7 @@ class GyroLoss(BaseLoss):
         # compute increment at min_train_freq by decimation
         for k in range(self.min_N):
             Omegas = SO3.qmul(Omegas[::2], Omegas[1::2])
-        rs = SO3.qlog(SO3.qmul(SO3.qinv(Omegas), Xs)).reshape(N,
-                -1, 3)[:, self.N0:]
+        rs = SO3.qlog(SO3.qmul(SO3.qinv(Omegas), Xs)).reshape(N, -1, 3)[:, self.N0:]
         loss = self.f_huber(rs)
         # compute increment from min_train_freq to max_train_freq
         for k in range(self.min_N, self.max_N):
