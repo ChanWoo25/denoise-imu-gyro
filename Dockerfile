@@ -6,7 +6,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN export os_arch="ubuntu2004/x86_64" \
 && rm /etc/apt/sources.list.d/cuda.list \
-&& rm /etc/apt/sources.list.d/nvidia-ml.list \
 && apt-key del 7fa2af80 \
 && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/${os_arch}/3bf863cc.pub \
 && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/${os_arch}/7fa2af80.pub
