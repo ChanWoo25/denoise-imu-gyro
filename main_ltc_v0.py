@@ -38,6 +38,15 @@ parser.add_argument('--seq_len', type=int, default=3200)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--dv', nargs='+', type=int, default=[16, 32])
 parser.add_argument('--dv_normed', nargs='+', type=int, default=[32, 64])
+
+parser.add_argument('--n_inter', type=int, default=20)
+parser.add_argument('--n_command', type=int, default=10)
+# parser.add_argument('--n_motor', type=int, default=0)
+parser.add_argument('--out_sensory', type=int, default=4)
+parser.add_argument('--out_inter', type=int, default=5)
+parser.add_argument('--rec_command', type=int, default=6)
+parser.add_argument('--in_motor', type=int, default=4)
+
 args = parser.parse_args()
 print(args.__dict__)
 
@@ -265,6 +274,7 @@ class SequenceLearner(pl.LightningModule):
         dw_32_gt = dw_32_gt.float()
         q_gt = q_gt.float()
 
+        self.model.set_nf(nf['test']['mean'], nf['test']['std'])
         w_hat = self.model.forward(us)
 
         loss = self.loss(w_hat, dw_16_gt, dw_32_gt)
@@ -396,14 +406,20 @@ loss = DgaLoss(params)
 in_features = 16 if args.input_type == 'window' else 6
 out_features = 3
 ncp_wiring = kncp.wirings.NCP(
-    inter_neurons=20,  # Number of inter neurons
-    command_neurons=10,  # Number of command neurons
-    motor_neurons=out_features,  # Number of motor neurons
-    sensory_fanout=4,  # How many outgoing synapses has each sensory neuron
-    inter_fanout=5,  # How many outgoing synapses has each inter neuron
-    recurrent_command_synapses=6,  # Now many recurrent synapses are in the
-    # command neuron layer
-    motor_fanin=4,  # How many incoming synapses has each motor neuron
+    # Number of inter neurons
+    inter_neurons=args.n_inter,
+    # Number of command neurons
+    command_neurons=args.n_command,
+    # Number of motor neurons
+    motor_neurons=out_features,
+    # How many outgoing synapses has each sensory neuron
+    sensory_fanout=args.out_sensory,
+    # How many outgoing synapses has each inter neuron
+    inter_fanout=args.out_inter,
+    # Now many recurrent synapses are in the command neuron layer
+    recurrent_command_synapses=args.rec_command,
+    # How many incoming synapses has each motor neuron
+    motor_fanin=args.in_motor,
 )
 ncp_cell = LTCCell(ncp_wiring, in_features)
 dga_pre_net = DgaPreNet(params).cuda()
