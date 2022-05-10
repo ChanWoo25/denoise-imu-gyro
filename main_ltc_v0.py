@@ -295,7 +295,7 @@ class SequenceLearner(pl.LightningModule):
         rpy_hat = SO3.to_rpy(rot_hat).cpu().numpy()
 
         rot_gt = SO3.from_quaternion(q_gt.squeeze().double())
-        rpy_gt = SO3.to_rpy(rot_gt).cpu().numpy()
+        rpy_gt = -SO3.to_rpy(rot_gt).cpu().numpy() # TODO: Resolve reflection issue
 
         offset = rpy_gt[0] - rpy_hat[0]
         rpy_hat += offset
@@ -435,6 +435,18 @@ elif args.input_type == 'window':
     ltc_sequence = DgaWinSequence(ncp_cell, dga_pre_net)
 
 learn = SequenceLearner(ltc_sequence, loss, lr=params['train']['optimizer']['lr'], nf=nf)
+
+# Checkpointing
+from pytorch_lightning.callbacks import ModelCheckpoint
+checkpoint_callback = ModelCheckpoint(
+    monitor='val_loss',
+    mode='min',
+    dirpath='./log/%s/'%args.id,
+    filename='{epoch}-{val_loss:.2f}',
+    save_last=True,
+    save_top_k=10
+)
+
 trainer = pl.Trainer(
     logger=pl.loggers.CSVLogger("log"),
     max_epochs=400,
@@ -443,7 +455,8 @@ trainer = pl.Trainer(
     gpus=1,
     check_val_every_n_epoch=10,
     log_every_n_steps=10,
-    num_sanity_val_steps=0
+    num_sanity_val_steps=0,
+    callbacks=[checkpoint_callback]
 )
 
 if args.mode == 'train' or args.mode == 'both':

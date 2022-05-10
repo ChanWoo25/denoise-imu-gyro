@@ -30,13 +30,13 @@ class DgaLoss(torch.nn.Module):
         for _ in range(4): # 2 ** 4 = 16
             drot_hat = drot_hat[::2].bmm(drot_hat[1::2])
         dw_16_loss = SO3.log(bmtm(drot_hat, drot_16_gt))
-        dw_16_loss = dw_16_loss.reshape(batch_size, -1, 3)[:, 10:] # 처음 10개는 패딩 관련으로 무효 처리
+        dw_16_loss = dw_16_loss.reshape(batch_size, -1, 3)[:, 5:] # 처음 10개는 패딩 관련으로 무효 처리
         dw_16_loss = self.f_huber(dw_16_loss)
 
         ## dw 32 Loss
         drot_hat = drot_hat[::2].bmm(drot_hat[1::2])
         dw_32_loss = SO3.log(bmtm(drot_hat, drot_32_gt))
-        dw_32_loss = dw_32_loss.reshape(batch_size, -1, 3)[:, 5:] # 처음 5개는 패딩 관련으로 무효 처리
+        dw_32_loss = dw_32_loss.reshape(batch_size, -1, 3)[:, 2:] # 처음 5개는 패딩 관련으로 무효 처리
         dw_32_loss = self.f_huber(dw_32_loss) / 2.0
 
-        return dw_32_loss + dw_32_loss
+        return dw_16_loss + dw_32_loss
