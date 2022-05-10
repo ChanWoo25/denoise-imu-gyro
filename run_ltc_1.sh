@@ -1,9 +1,11 @@
 #! /bin/bash
 
 
-python3 main_ltc_v0.py --mode='train' \
-  --input_type 'window' --seq_len 6400 --train_batch_size 6 \
-  --id='220509_Window_V0'
+CUDA_VISIBLE_DEVICES=0,1 python3 main_ltc_v0.py --mode='train' \
+  --machine='server' --input_type 'window' \
+  --seq_len 16000 --train_batch_size 6 \
+  --id='220510_Window_V0'
+
   # \
   # --n_inter=32 --n_command=16 --out_sensory=8 \
   # --out_inter=10 --rec_command=10 --in_motor=8

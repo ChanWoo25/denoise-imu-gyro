@@ -1,10 +1,11 @@
 #! /bin/bash
-
-
-CUDA_VISIBLE_DEVICES=0 python3 main_ltc_v0.py --mode='train' \
+CUDA_VISIBLE_DEVICES=1 python3 main_ltc_v0.py --mode='train' \
   --machine='server' --input_type 'raw' \
   --seq_len 16000 --train_batch_size 6 \
-  --id='220510_Raw_V0'
+  --id='220510_Raw_V1' \
+  --n_inter=32 --n_command=16 --out_sensory=8 \
+  --out_inter=10 --rec_command=10 --in_motor=8
+
 
 
 # python3 main_ltc_v0.py \

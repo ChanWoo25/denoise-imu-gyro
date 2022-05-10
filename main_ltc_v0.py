@@ -28,6 +28,7 @@ import argparse
 parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('--debug', type=bool, default=False)
 parser.add_argument('--mode', type=str, default='train')
+parser.add_argument('--machine', type=str, default='desktop')
 parser.add_argument('--id', type=str, default='test')
 parser.add_argument('--input_type', type=str, default='window')
 parser.add_argument('--resume_path', type=str, default=None)
@@ -52,6 +53,10 @@ print(args.__dict__)
 
 euroc_data_dir = os.path.join('/root', 'project', 'datasets', 'EUROC')
 ltc_results_dir = os.path.join('/root', 'project', 'results', 'LTC')
+if args.machine == 'server':
+    euroc_data_dir = os.path.join('/home/leecw', 'project', 'datasets', 'EUROC')
+    ltc_results_dir = os.path.join('/home/leecw', 'project', 'results', 'LTC')
+
 
 params = {
     'debug': args.debug,
