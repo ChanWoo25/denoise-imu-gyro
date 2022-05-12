@@ -1,10 +1,20 @@
 #! /bin/bash
 
 
-CUDA_VISIBLE_DEVICES=0,1 python3 main_ltc_v0.py --mode='train' \
-  --machine='server' --input_type 'window' \
-  --seq_len 16000 --train_batch_size 6 \
-  --id='220510_Window_V0'
+# # [220511 00:56 Training]
+# CUDA_VISIBLE_DEVICES=0,1 python3 main_ltc_v0.py --mode='train' \
+#   --machine='server' --input_type 'window' \
+#   --seq_len 16000 --train_batch_size 6 \
+#   --id='220510_Window_V0'
+
+# [220511 00:56 Training]
+CUDA_VISIBLE_DEVICES=0 \
+python3 main_ltc_v0.py --mode='train' \
+  --machine='server' --input_type 'raw' \
+  --seq_len 16000 --train_batch_size 1 \
+  --id='220510_Raw_V3' \
+  --n_inter=64 --n_command=32 --out_sensory=16 \
+  --out_inter=20 --rec_command=20 --in_motor=16
 
   # \
   # --n_inter=32 --n_command=16 --out_sensory=8 \

@@ -36,10 +36,13 @@ parser.add_argument('--test_path', type=str, default=None)
 parser.add_argument('--c0', type=int, default=16)
 parser.add_argument('--train_batch_size', type=int, default=6)
 parser.add_argument('--seq_len', type=int, default=3200)
+parser.add_argument('--goal_epoch', type=int, default=400)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--dv', nargs='+', type=int, default=[16, 32])
 parser.add_argument('--dv_normed', nargs='+', type=int, default=[32, 64])
 
+
+# Wiring Hyper paramters
 parser.add_argument('--n_inter', type=int, default=20)
 parser.add_argument('--n_command', type=int, default=10)
 # parser.add_argument('--n_motor', type=int, default=0)
@@ -47,7 +50,9 @@ parser.add_argument('--out_sensory', type=int, default=4)
 parser.add_argument('--out_inter', type=int, default=5)
 parser.add_argument('--rec_command', type=int, default=6)
 parser.add_argument('--in_motor', type=int, default=4)
-
+# LTC Cell Hyper parameters
+parser.add_argument('--ode_unfolds', type=int, default=6)
+# Parse
 args = parser.parse_args()
 print(args.__dict__)
 
@@ -426,7 +431,7 @@ ncp_wiring = kncp.wirings.NCP(
     # How many incoming synapses has each motor neuron
     motor_fanin=args.in_motor,
 )
-ncp_cell = LTCCell(ncp_wiring, in_features)
+ncp_cell = LTCCell(ncp_wiring, in_features, ode_unfolds=args.ode_unfolds)
 dga_pre_net = DgaPreNet(params).cuda()
 #######################
 
@@ -453,8 +458,8 @@ checkpoint_callback = ModelCheckpoint(
 )
 
 trainer = pl.Trainer(
-    logger=pl.loggers.CSVLogger("log"),
-    max_epochs=400,
+    logger=pl.loggers.CSVLogger(ltc_results_dir, name=args.id),
+    max_epochs=args.goal_epoch,
     progress_bar_refresh_rate=1,
     gradient_clip_val=1,  # Clip gradient to stabilize training
     gpus=1,
