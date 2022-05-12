@@ -53,6 +53,7 @@ class LearningProcess:
             self.net.load_state_dict(weights)
         else:
             self.params = yload(params['result_dir'], 'params.yaml')
+            self.figure_dir = '/root/project/results/DenoiseIMU/figures'
             cprint('  No need to initialize a model', 'yellow')
             return
 
@@ -299,17 +300,19 @@ class LearningProcess:
 
             # Validate
             if epoch % freq_val == 0:
-                loss = self.loop_val(dataset_val, criterion)
+                loss, gloss_epoch, acc_loss_epoch, gap_loss_epoch = self.loop_val(dataset_val, criterion)
                 dt = time.time() - start_time
 
                 if loss <= best_loss:
                     cprint('Epoch %4d Loss(val) Decrease - %.2fs' % (epoch, dt), 'blue')
+                    print('  - gloss: %.4f, acc_loss: %.4f, gap_loss: %.4f' % (gloss_epoch, acc_loss_epoch, gap_loss_epoch))
                     print('  - current: %.4f' % loss.item())
                     print('  - best   : %.4f' % best_loss.item())
                     best_loss = loss
                     self.save_net(epoch, 'best')
                 else:
                     cprint('Epoch %4d Loss(val) Increase - %.2fs' % (epoch, dt), 'yellow')
+                    print('  - gloss: %.4f, acc_loss: %.4f, gap_loss: %.4f' % (gloss_epoch, acc_loss_epoch, gap_loss_epoch))
                     print('  - current: %.4f' % loss.item())
                     print('  - best   : %.4f' % best_loss.item())
                     self.save_net(epoch, 'log')
@@ -327,7 +330,7 @@ class LearningProcess:
         weights = torch.load(self.weight_path)
         self.net.load_state_dict(weights)
         self.net.cuda()
-        test_loss = self.loop_val(dataset_test, criterion)
+        test_loss, gloss_epoch, acc_loss_epoch, gap_loss_epoch = self.loop_val(dataset_test, criterion)
         dict_loss = {
             'final_loss/val': best_loss.item(),
             'final_loss/test': test_loss.item()
@@ -409,12 +412,12 @@ class LearningProcess:
             self.plot_accel_correction(accel_corrections)
 
             ## nomred
-            for window in self.params['train']['loss']['dv_normed']:
-                v_raw = fast_acc_integration(a_raw.unsqueeze(0)).squeeze()
-                v_normed_raw = vnorm(v_raw.unsqueeze(0), window_size=window).squeeze()
-                v_normed_hat = vnorm(v_hat.unsqueeze(0), window_size=window).squeeze()
-                v_normed_gt  = vnorm(v_gt.unsqueeze(0),  window_size=window).squeeze()
-                self.plot_v_normed(v_normed_raw, v_normed_hat, v_normed_gt, window)
+            # for window in self.params['train']['loss']['dv_normed']:
+            #     v_raw = fast_acc_integration(a_raw.unsqueeze(0)).squeeze()
+            #     v_normed_raw = vnorm(v_raw.unsqueeze(0), window_size=window).squeeze()
+            #     v_normed_hat = vnorm(v_hat.unsqueeze(0), window_size=window).squeeze()
+            #     v_normed_gt  = vnorm(v_gt.unsqueeze(0),  window_size=window).squeeze()
+            #     self.plot_v_normed(v_normed_raw, v_normed_hat, v_normed_gt, window)
 
             ## Acceleration
             self.plot_acceleration(a_raw, a_hat, a_gt)
@@ -436,7 +439,8 @@ class LearningProcess:
             rot_gt = rot_gt.reshape(us.shape[0], us.shape[1], 3, 3)
 
             w_hat, a_hat = self.net(us, rot_gt)
-            loss = criterion(w_hat, dw_16, a_hat, dv_normed)/len(dataloader)
+            gloss, acc_loss, gap_loss = criterion(w_hat, dw_16, a_hat, dv_normed)
+            loss = (gloss + acc_loss + gap_loss)/len(dataloader)
             loss.backward()
 
             # for name, param in self.net.named_parameters():
@@ -450,7 +454,11 @@ class LearningProcess:
 
     def loop_val(self, dataset, criterion):
         """Forward loop over validation data"""
-        loss_epoch = 0
+        loss_epoch = 0.0
+        gloss_epoch = 0.0
+        acc_loss_epoch = 0.0
+        gap_loss_epoch = 0.0
+
         self.net.eval()
         with torch.no_grad():
             for i in range(len(dataset)):
@@ -462,10 +470,18 @@ class LearningProcess:
                 w_hat, a_hat = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0))
                 for key in dv_normed:
                     dv_normed[key] = dv_normed[key].unsqueeze(0)
-                loss = criterion(w_hat, dw_16.unsqueeze(0), a_hat, dv_normed)/len(dataset)
+                gloss, acc_loss, gap_loss = criterion(w_hat, dw_16.unsqueeze(0), a_hat, dv_normed)
+                loss = (gloss + acc_loss + gap_loss)/len(dataset)
                 loss_epoch += loss.cpu()
+                gloss_epoch += gloss.cpu()
+                acc_loss_epoch += acc_loss.cpu()
+                gap_loss_epoch += gap_loss.cpu()
+
+        gloss_epoch /= len(dataset)
+        acc_loss_epoch /= len(dataset)
+        gap_loss_epoch /= len(dataset)
         self.net.train()
-        return loss_epoch
+        return loss_epoch, gloss_epoch, acc_loss_epoch, gap_loss_epoch
 
     def loop_test(self, dataset, criterion):
         """Forward loop over test data"""
@@ -485,7 +501,8 @@ class LearningProcess:
                 w_hat, a_hat = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0))
                 for key in dv_normed:
                     dv_normed[key] = dv_normed[key].unsqueeze(0)
-                loss = criterion(w_hat, dw_16.unsqueeze(0), a_hat, dv_normed)/len(dataset)
+                gloss, acc_loss, gap_loss = criterion(w_hat, dw_16.unsqueeze(0), a_hat, dv_normed)
+                loss = (gloss + acc_loss + gap_loss)/len(dataset)
 
                 self.dict_test_result[seq] = {
                     'w_hat': w_hat[0].cpu(),
@@ -709,7 +726,7 @@ class LearningProcess:
         ax[2].set_title('Accel - Z')
         ax[2].legend(loc='best')
 
-        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'acceleration')
+        _dir  = os.path.join(self.figure_dir, self.seq, 'acceleration')
         _path = os.path.join(_dir, self.id + '.png')
         if not os.path.exists(_dir):
             os.makedirs(_dir)
@@ -723,6 +740,45 @@ class LearningProcess:
         # avg_a_raw = torch.zeros_like(a_raw)
         # for i in range(-side, side+1):
         #     avg_a_raw
+
+        ## Window average version
+        avg_window = 15
+        pad = avg_window // 2
+        def avg(arr):
+            N = arr.shape[0]
+            M = arr.shape[1]
+            pad0 = arr[0, :].unsqueeze(0).expand(pad, M)
+            padN = arr[-1, :].unsqueeze(0).expand(pad, M)
+            tmp_arr = np.concatenate([pad0, arr, padN], axis=0)
+            avg_arr = np.zeros_like(arr)
+            for i in range(avg_window):
+                avg_arr += tmp_arr[i: i+N]
+            avg_arr /= avg_window
+            return avg_arr
+        smoothed_a_hat = avg(a_hat)
+
+        acc_gap_hat = a_hat - smoothed_a_hat
+        acc_gap_hat_std = (acc_gap_hat**2).mean(dim=0).sqrt()
+
+        fig, ax = plt.subplots(nrows=3, ncols=1, figsize=self.figsize, dpi=250)
+        fig.suptitle('Accel Gap / %s / %s' % (self.seq, self.id), fontsize=20)
+
+        ax[0].plot(self.ts, acc_gap_hat[:, 0], 'k', linewidth=1, label="Raw. acc_gap(x)")
+        ax[0].set_title('Accel gap of x == %1.4f' % acc_gap_hat_std[0].item())
+        ax[0].legend(loc='best')
+        ax[1].plot(self.ts, acc_gap_hat[:, 1], 'k', linewidth=1, label="Raw. acc_gap(y)")
+        ax[1].set_title('Accel gap of y == %1.4f' % acc_gap_hat_std[1].item())
+        ax[1].legend(loc='best')
+        ax[2].plot(self.ts, acc_gap_hat[:, 2], 'k', linewidth=1, label="Raw. acc_gap(z)")
+        ax[2].set_title('Accel gap of z == %1.4f' % acc_gap_hat_std[2].item())
+        ax[2].legend(loc='best')
+
+        _dir  = os.path.join(self.figure_dir, self.seq, 'accel_gap')
+        _path = os.path.join(_dir, self.id + '.png')
+        if not os.path.exists(_dir):
+            os.makedirs(_dir)
+        self.savefig(ax, fig, _path)
+        plt.close(fig)
 
 
 
@@ -744,7 +800,7 @@ class LearningProcess:
         ax[2].set_title('Velocity - Z')
         ax[2].legend(loc='best')
 
-        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'velocity')
+        _dir  = os.path.join(self.figure_dir, self.seq, 'velocity')
         _path = os.path.join(_dir, self.id + '.png')
         if not os.path.exists(_dir):
             os.makedirs(_dir)
@@ -773,7 +829,7 @@ class LearningProcess:
         ax[2].set_title('Vel_normed - Z')
         ax[2].legend(loc='best')
 
-        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'normed_vel_w%d' % window_size)
+        _dir  = os.path.join(self.figure_dir, self.seq, 'normed_vel_w%d' % window_size)
         _path = os.path.join(_dir, self.id + '.png')
         if not os.path.exists(_dir):
             os.makedirs(_dir)
@@ -846,7 +902,7 @@ class LearningProcess:
             axs[i].plot(self.ts, rpy_gt[:, i]%360, color='black', label=r'ground truth')
             axs[i].set_xlim(self.ts[0], self.ts[-1])
 
-        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'orientation')
+        _dir  = os.path.join(self.figure_dir, self.seq, 'orientation')
         _path = os.path.join(_dir, self.id + '.png')
         if not os.path.exists(_dir):
             os.makedirs(_dir)
@@ -870,7 +926,7 @@ class LearningProcess:
             axs[i].plot(self.ts, err_hat[:, i] % 360, color='blue', label=r'net IMU')
             axs[i].set_xlim(self.ts[0], self.ts[-1])
 
-        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'orientation_error')
+        _dir  = os.path.join(self.figure_dir, self.seq, 'orientation_error')
         _path = os.path.join(_dir, self.id + '.png')
         if not os.path.exists(_dir):
             os.makedirs(_dir)
@@ -904,7 +960,7 @@ class LearningProcess:
         plt.plot(self.ts, gyro_corrections[:, 1], label='correction of $w_y$')
         plt.plot(self.ts, gyro_corrections[:, 2], label='correction of $w_z$')
 
-        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'gyro_correction')
+        _dir  = os.path.join(self.figure_dir, self.seq, 'gyro_correction')
         _path = os.path.join(_dir, self.id + '.png')
         if not os.path.exists(_dir):
             os.makedirs(_dir)
@@ -920,7 +976,7 @@ class LearningProcess:
         plt.plot(self.ts, accel_corrections[:, 1], label='correction of $a_y$')
         plt.plot(self.ts, accel_corrections[:, 2], label='correction of $a_z$')
 
-        _dir  = os.path.join('/root/denoise/results/figures', self.seq, 'accel_correction')
+        _dir  = os.path.join(self.figure_dir, self.seq, 'accel_correction')
         _path = os.path.join(_dir, self.id + '.png')
         if not os.path.exists(_dir):
             os.makedirs(_dir)

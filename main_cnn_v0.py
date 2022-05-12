@@ -25,8 +25,8 @@ print(args.__dict__)
 
 params = {
     'debug': args.debug,
-    'result_dir': os.path.join('/root/denoise/results', args.id),
-    'test_dir': os.path.join('/root/denoise/results', args.id, 'tests'),
+    'result_dir': os.path.join('/root/project/results/DenoiseIMU', args.id),
+    'test_dir': os.path.join('/root/project/results/DenoiseIMU', args.id, 'tests'),
     'id': args.id,
 
     'dataset': {
@@ -53,8 +53,8 @@ params = {
             'V1_01_easy',
         ],
         # size of trajectory during training
-        'data_dir':     "/root/denoise/data",
-        'predata_dir':  os.path.join('/root/denoise/results', 'predata'),
+        'data_dir':     "/root/project/datasets/EUROC",
+        'predata_dir':  os.path.join('/root/project/results/DenoiseIMU/predata'),
         'N': 32 * 500, # should be integer * 'max_train_freq'
         'min_train_freq': 16,
         'max_train_freq': 32,
@@ -107,7 +107,7 @@ params = {
         # frequency of validation step
         'freq_val': 40,
         # total number of epochs
-        'n_epochs': 1000,
+        'n_epochs': 1600,
     }
 }
 

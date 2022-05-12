@@ -62,7 +62,7 @@ class DGALoss(torch.nn.Module):
             # print('- drot_hat:', drot_hat.shape, drot_hat.shape, drot_hat.device)
             # print('- rs:', drot_32.shape, drot_32.shape, drot_32.device)
             rs = SO3.log(bmtm(drot_hat, drot_32)).reshape(N, -1, 3)[:, self.N0:]
-            gyro_loss_32 = self.f_huber(rs)/(2**(k - self.min_N + 1))
+            gyro_loss_32 = self.f_huber(rs)/(2**(k - self.min_N + 1)) / 2.0
         ###
 
         # print('- gyro loss 16:', gyro_loss_16)
@@ -170,9 +170,37 @@ class DGALoss(torch.nn.Module):
             # print('- loss: ', loss_normed.item())
             # dv_normed_loss[key] = loss_normed
 
-        return loss
+        ### Noise Loss - Window size is 51 (51//2 == 25[pad])
+        avg_window = 15
+        pad = avg_window // 2
+        def avg(arr):
+            avg_window = pad + 1 + pad
+            batch = arr.shape[0]
+            N = arr.shape[1]
+            M = arr.shape[2]
+            pad0 = arr[:, 0, :].unsqueeze(1).expand(batch, pad, M)
+            padN = arr[:, -1, :].unsqueeze(1).expand(batch, pad, M)
+            tmp_arr = torch.cat([pad0, arr, padN], dim=1)
+            avg_arr = torch.zeros_like(arr)
+            for i in range(avg_window):
+                avg_arr += tmp_arr[:, i: i+N]
+            avg_arr /= avg_window
+            return avg_arr
+        smoothed_a_hat = avg(a_hat)
+        # print('smoothed_a_hat:', smoothed_a_hat.shape) # ([6, 16000, 3])
+        gap_a_hat = (smoothed_a_hat - a_hat) ** 2
+        gap_a_hat = gap_a_hat.mean(dim=1)
+        gap_a_hat = gap_a_hat.mean(dim=0)
+        # print('gap_a_hat:', gap_a_hat.shape) # torch.Size([3])
+        # gap_a_hat = gap_a_hat
+        # gap_x_loss = gap_a_hat[0]
+        # gap_y_loss = gap_a_hat[1]
+        # gap_z_loss = gap_a_hat[2]
+        gap_loss =  torch.Tensor([.0]).cuda() # gap_x_loss + gap_y_loss + gap_z_loss
+
+        return loss, gap_loss
 
     def forward(self, w_hat, dw_16, a_hat, gt_dv_normed):
         gloss = self.gyro_loss(w_hat, dw_16)
-        aloss = self.accel_loss(a_hat, gt_dv_normed)
-        return gloss + aloss
+        acc_loss, gap_loss = self.accel_loss(a_hat, gt_dv_normed)
+        return gloss, acc_loss, gap_loss

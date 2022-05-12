@@ -95,8 +95,9 @@ def mkdir(*paths):
 def yload(*f_names):
     """YAML load"""
     f_name = os.path.join(*f_names)
+    print('yload: %s' % f_name)
     with open(f_name, 'r') as f:
-        yaml_dict = yaml.load(f)
+        yaml_dict = yaml.load(f, Loader=yaml.FullLoader)
     return yaml_dict
 
 def ydump(yaml_dict, *f_names):
