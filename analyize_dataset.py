@@ -10,6 +10,9 @@ import os
 from src.lie_algebra import SO3
 from src.utils import bmtm, bmtv, bmmt, bbmv
 
+tmp = {
+
+}
 euroc_seqs = [
     'MH_01_easy',
     'MH_02_easy',
@@ -47,18 +50,18 @@ def interpolate(x, t, t_int):
 class Data:
     def __init__(self, seq):
         super().__init__()
-        if not (seq in euroc_seqs):
-            print('[FATAL] -- Not existing dataset name.')
-            exit(1)
-        else:
-            print('[Init] -- Data instance is created for %s' % seq)
+        # if not (seq in euroc_seqs):
+        #     print('[FATAL] -- Not existing dataset name.')
+        #     exit(1)
+        # else:
+        #     print('[Init] -- Data instance is created for %s' % seq)
 
-        self.root = './data'
+        self.root = 'datasets/EUROC'
         self.path_seq = os.path.join(self.root, seq, 'mav0')
         self.path_dir_cam0 = os.path.join(self.path_seq, 'cam0')
         self.path_dir_imu  = os.path.join(self.path_seq, 'imu0')
         self.path_dir_gt   = os.path.join(self.path_seq, 'state_groundtruth_estimate0')
-        self.path_dir_result   = os.path.join('./results', 'figures', seq, 'analyze_dataset')
+        self.path_dir_result   = os.path.join('./results', 'Figures', seq)
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.seq = seq
 
@@ -117,6 +120,7 @@ class Data:
 
             a_raw = avg(a_raw)
             a_gt = avg(a_gt)
+
 
         a_raw = a_raw.cpu()
         v_gt = v_gt.cpu()
@@ -193,12 +197,172 @@ class Data:
             axs[1].legend(loc='best')
 
 
-            pth = os.path.join(self.path_dir_result, 'avg_accel_w%d.png' % avg_window)
+            pth = os.path.join(self.path_dir_result, 'avg_accel_W%d.png' % avg_window)
             fig.savefig(pth)
             plt.tight_layout()
             plt.close(fig)
 
+    def plot_accel_gap(self, start=None, end=None, avg_window=1):
 
+        v_gt = torch.tensor(self.gt_int[:, 8:11], device=self.device)
+        a_gt = (v_gt[1:] - v_gt[:-1]) / 0.005
+        a_gt = torch.cat([a_gt[0].unsqueeze(0), (a_gt[1:] + a_gt[:-1]) / 2.0, a_gt[-1].unsqueeze(0)])
+        ts = torch.tensor(self.gt_int[:, 0], device=self.device)
+
+
+        a_raw = torch.tensor(self.imu[:, 4:7], device=self.device)
+        q_gt = torch.tensor(self.gt_int[:, 4:8], device=self.device)
+        q_gt = q_gt / q_gt.norm(dim=1, keepdim=True)
+        rot_gt = SO3.from_quaternion(q_gt, ordering='wxyz')
+        a_raw = torch.einsum('bij, bj -> bi', rot_gt, a_raw)
+
+        if start is not None and end is not None:
+            i0 = np.searchsorted(ts, start)
+            iN = np.searchsorted(ts, end, side='right')
+            print('Clip %d to %d' % (i0, iN))
+
+            a_raw = a_raw[i0:iN]
+            v_gt = v_gt[i0:iN]
+            a_gt = a_gt[i0:iN]
+            ts = ts[i0:iN]
+
+        assert avg_window % 2 == 1 # recommend odd num for window_size
+        pad = avg_window // 2
+        def avg(arr):
+            N = arr.shape[0]
+            M = arr.shape[1]
+            pad0 = arr[0, :].unsqueeze(0).expand(pad, M)
+            padN = arr[-1, :].unsqueeze(0).expand(pad, M)
+            tmp_arr = torch.cat([pad0, arr, padN], dim=0)
+            avg_arr = torch.zeros_like(arr)
+            for i in range(avg_window):
+                avg_arr += tmp_arr[i: i+N]
+            avg_arr /= avg_window
+            return avg_arr
+        smoothed_a_raw = avg(a_raw)
+        smoothed_a_gt = avg(a_gt)
+
+        acc_gap_raw = a_raw - smoothed_a_raw
+        acc_gap_raw_std = (acc_gap_raw**2).mean(dim=0).sqrt()
+        # print("acc_gap_raw_std:", acc_gap_raw_std.shape, acc_gap_raw_std.device)
+
+        acc_gap_gt = a_gt - smoothed_a_gt
+        acc_gap_gt_std = (acc_gap_gt**2).mean(dim=0).sqrt()
+        # print("acc_gap_gt_std:", acc_gap_gt_std.shape, acc_gap_gt_std.device)
+
+        a_raw = a_raw.cpu()
+        v_gt = v_gt.cpu()
+        a_gt = a_gt.cpu()
+        acc_gap_raw = acc_gap_raw.cpu()
+        acc_gap_raw_std = acc_gap_raw_std.cpu()
+        acc_gap_gt = acc_gap_gt.cpu()
+        acc_gap_gt_std = acc_gap_gt_std.cpu()
+        ts = ts.cpu()
+
+        ## Visualize accel
+        if False:
+            fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(40, 16), dpi=200)
+            fig.suptitle('Acceleration / %s' % self.seq, fontsize=20)
+
+            axs[0][0].plot(ts, a_raw[:, 0], 'k', linewidth=1, label="Raw. acc(x)")
+            axs[0][0].plot(ts, a_gt[:, 0],  'r', linewidth=1, label="GT.  acc(x)")
+            axs[0][0].set_title('Accel - X')
+            axs[0][0].legend(loc='best')
+            axs[0][1].plot(ts, a_raw[:, 1], 'k', linewidth=1, label="Raw. acc(y)")
+            axs[0][1].plot(ts, a_gt[:, 1],  'r', linewidth=1, label="GT.  acc(y)")
+            axs[0][1].set_title('Accel - Y')
+            axs[0][1].legend(loc='best')
+            axs[1][0].plot(ts, a_raw[:, 2], 'k', linewidth=1, label="Raw. acc(z)")
+            axs[1][0].plot(ts, a_gt[:, 2],  'r', linewidth=1, label="GT.  acc(z)")
+            axs[1][0].set_title('Accel - Z')
+            axs[1][0].legend(loc='best')
+
+            axs[1][1].plot(ts, a_raw[:, 2] - a_gt[:, 2], 'k', linewidth=1, label="Gravity")
+            axs[1][1].set_title('Gravity')
+            axs[1][1].legend(loc='best')
+
+            pth = os.path.join(self.path_dir_result, 'accel.png')
+            fig.savefig(pth)
+            plt.tight_layout()
+            plt.close(fig)
+
+        ## Visualize avg accel
+        if False:
+            fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(40, 16), dpi=200)
+            fig.suptitle('Average accel / %s' % self.seq, fontsize=20)
+
+            fig = plt.figure(constrained_layout=True, figsize=(32, 16), dpi=200)
+            from matplotlib.gridspec import GridSpec
+            gs = GridSpec(2, 2, figure=fig)
+
+            axs = [
+                [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1])],
+                fig.add_subplot(gs[1, :])
+            ]
+
+            axs[0][0].plot(ts, a_raw[:, 0], 'k', linewidth=1, label="Raw. acc(x)")
+            axs[0][0].plot(ts, a_gt[:, 0],  'r', linewidth=1, label="GT.  acc(x)")
+            axs[0][0].set_title('Accel - X')
+            axs[0][0].legend(loc='best')
+
+            axs[0][1].plot(ts, a_raw[:, 1], 'k', linewidth=1, label="Raw. acc(y)")
+            axs[0][1].plot(ts, a_gt[:, 1],  'r', linewidth=1, label="GT.  acc(y)")
+            axs[0][1].set_title('Accel - Y')
+            axs[0][1].legend(loc='best')
+
+            # axs[1][0].plot(ts, a_raw[:, 2], 'k', linewidth=1, label="Raw. acc(z)")
+            # axs[1][0].plot(ts, a_gt[:, 2],  'r', linewidth=1, label="GT.  acc(z)")
+            # axs[1][0].set_title('Accel - Z')
+            # axs[1][0].legend(loc='best')
+
+            axs[1].plot(ts, a_raw[:, 2] - a_gt[:, 2], 'k', linewidth=1, label="Gravity")
+            axs[1].set_title('Gravity')
+            axs[1].legend(loc='best')
+
+            pth = os.path.join(self.path_dir_result, 'avg_accel_W%d.png' % avg_window)
+            fig.savefig(pth)
+            plt.tight_layout()
+            plt.close(fig)
+
+        ## Visualize acc gap
+        tmp[self.seq] = [self.seq]
+
+        fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(40, 20), dpi=200)
+        fig.suptitle('Average gap / %s' % self.seq, fontsize=20)
+        axs[0][0].plot(ts, acc_gap_raw[:, 0], 'k', linewidth=1, label="Raw. acc_gap(x)")
+        axs[0][0].set_title('Accel gap of x == %1.4f' % acc_gap_raw_std[0].item())
+        axs[0][0].legend(loc='best')
+        axs[0][1].plot(ts, acc_gap_gt[:, 0], 'r', linewidth=1, label="GT. acc_gap(x)")
+        axs[0][1].set_title('Accel gt gap of x == %1.4f' % acc_gap_gt_std[0].item())
+        axs[0][1].legend(loc='best')
+        tmp[self.seq].append(acc_gap_raw_std[0].item())
+        tmp[self.seq].append( acc_gap_gt_std[0].item())
+
+        axs[1][0].plot(ts, acc_gap_raw[:, 1], 'k', linewidth=1, label="Raw. acc_gap(y)")
+        axs[1][0].set_title('Accel gap of y == %1.4f' % acc_gap_raw_std[1].item())
+        axs[1][0].legend(loc='best')
+        axs[1][1].plot(ts, acc_gap_gt[:, 1], 'r', linewidth=1, label="GT. acc_gap(y)")
+        axs[1][1].set_title('Accel gt gap of y == %1.4f' % acc_gap_gt_std[1].item())
+        axs[1][1].legend(loc='best')
+        tmp[self.seq].append(acc_gap_raw_std[1].item())
+        tmp[self.seq].append( acc_gap_gt_std[1].item())
+
+        axs[2][0].plot(ts, acc_gap_raw[:, 2], 'k', linewidth=1, label="Raw. acc_gap(z)")
+        axs[2][0].set_title('Accel gap of z == %1.4f' % acc_gap_raw_std[2].item())
+        axs[2][0].legend(loc='best')
+        axs[2][1].plot(ts, acc_gap_gt[:, 2], 'r', linewidth=1, label="GT. acc_gap(z)")
+        axs[2][1].set_title('Accel gt gap of z == %1.4f' % acc_gap_gt_std[2].item())
+        axs[2][1].legend(loc='best')
+        tmp[self.seq].append(acc_gap_raw_std[2].item())
+        tmp[self.seq].append( acc_gap_gt_std[2].item())
+
+        l = tmp[self.seq]
+        print(l)
+
+        pth = os.path.join(self.path_dir_result, 'accel_gap.png')
+        plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+        fig.savefig(pth)
+        plt.close(fig)
 
     def plot_img_imu(self, img_file, window_size):
         img = Image.open(img_file)
@@ -224,9 +388,11 @@ euroc_seqs = [
     'V2_02_medium',
     'V2_03_difficult'
 ]
-if (True):
+
+if (False):
     mh_01_easy = Data('MH_01_easy')
     # mh_01_easy.plot_accel(1403636601713555456, 1403636623613555456, avg_window=25)
+    mh_01_easy.plot_accel(1403636601713555456, 1403636623613555456, avg_window=53)
     mh_01_easy.plot_accel(1403636601713555456, 1403636623613555456, avg_window=53)
 
     # mh_01_easy = Data('MH_02_easy')
@@ -235,5 +401,30 @@ if (True):
     # mh_01_easy = Data('MH_03_medium')
     # mh_01_easy.plot_accel()
 
+for seq in euroc_seqs:
+    dataset = Data(seq)
+    # dataset.plot_accel(avg_window=1)
+    dataset.plot_accel_gap(avg_window=51)
 
+r_x = 0.0
+r_y = 0.0
+r_z = 0.0
+g_x = 0.0
+g_y = 0.0
+g_z = 0.0
+
+for seq in euroc_seqs:
+    r_x += tmp[seq][1]
+    g_x += tmp[seq][2]
+    r_y += tmp[seq][3]
+    g_y += tmp[seq][4]
+    r_z += tmp[seq][5]
+    g_z += tmp[seq][6]
+
+r_x /= len(euroc_seqs); print(r_x)
+g_x /= len(euroc_seqs); print(g_x)
+r_y /= len(euroc_seqs); print(r_y)
+g_y /= len(euroc_seqs); print(g_y)
+r_z /= len(euroc_seqs); print(r_z)
+g_z /= len(euroc_seqs); print(g_z)
 
