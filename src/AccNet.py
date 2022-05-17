@@ -74,19 +74,9 @@ class DGANet(torch.nn.Module):
         self.g          = torch.nn.Parameter(torch.Tensor([0,0,9.81]), requires_grad=False) # Alse can be 9.81 | Is there any difference on results?
         ###
 
-        ### Non-parameter member variables
-        self.gt_rots = None
-        ###
-
-        print("  -- success --\n")
-
     def set_normalized_factors(self, mean_u, std_u):
         self.mean_u = torch.nn.Parameter(mean_u.cuda(), requires_grad=False)
         self.std_u = torch.nn.Parameter(std_u.cuda(), requires_grad=False)
-
-    def grab_gt_rots(self, gt_rots:torch.Tensor):
-        self.gt_rots = gt_rots
-        print("gt_rots' grad:", self.gt_rots.requires_grad)
 
     def forward(self, x:torch.Tensor, rot_gt:torch.Tensor, mode='train'):
         us = torch.clone(x)
