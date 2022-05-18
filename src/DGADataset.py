@@ -52,18 +52,49 @@ class DGADataset(Dataset):
 
     def __getitem__(self, i):
         seq        = self.sequences[i]
-        data       = torch.load(os.path.join(self.predata_dir, seq, 'data.pt'))
-        gt_dict    = torch.load(os.path.join(self.predata_dir, seq, 'gt.pt'))
-        gt_dv_dict = torch.load(os.path.join(self.predata_dir, seq, 'dv.pt'))
 
-        ts = data['ts'].cuda()
-        us = data['us'].cuda()
+        # data       = torch.load(os.path.join(self.predata_dir, seq, 'data.pt'))
+        # gt_dict    = torch.load(os.path.join(self.predata_dir, seq, 'gt.pt'))
+        # gt_dv_dict = torch.load(os.path.join(self.predata_dir, seq, 'dv.pt'))
 
-        dw_16   = gt_dict['dw_16'].cuda()
-        gt      = gt_dict['gt_interpolated'].cuda()
-        a_gt    = gt_dict['a_gt'].cuda()
+        # ts = data['ts'].cuda()
+        # us = data['us'].cuda()
 
-        gt_dv_normed = gt_dv_dict['dv_normed']
+        # dw_16   = gt_dict['dw_16'].cuda()
+        # gt      = gt_dict['gt_interpolated'].cuda()
+        # a_gt    = gt_dict['a_gt'].cuda()
+
+        # gt_dv_normed = gt_dv_dict['dv_normed']
+
+        fname = os.path.join(self.predata_dir, seq, 'imu.csv')
+        imu = np.loadtxt(fname, delimiter=',')
+        imu = torch.from_numpy(imu).cuda()
+        ts = imu[:, 0]
+        us = imu[:, 1:]
+
+        fname = os.path.join(self.predata_dir, seq, 'q_gt.csv')
+        q_gt = np.loadtxt(fname, delimiter=',')
+        q_gt = torch.from_numpy(q_gt).cuda()
+
+        # fname = os.path.join(self.predata_dir, seq, 'w_gt.csv')
+        # w_gt = np.loadtxt(fname, delimiter=',')
+        # w_gt = torch.from_numpy(w_gt).cuda()
+
+        fname = os.path.join(self.predata_dir, seq, 'dv_16_gt.csv')
+        dv_16_gt = np.loadtxt(fname, delimiter=',')
+        dv_16_gt = torch.from_numpy(dv_16_gt).cuda()
+
+        fname = os.path.join(self.predata_dir, seq, 'dv_32_gt.csv')
+        dv_32_gt = np.loadtxt(fname, delimiter=',')
+        dv_32_gt = torch.from_numpy(dv_32_gt).cuda()
+
+        dv_normed_windows = [16, 32, 64, 128, 256, 512] #
+        dv_normed_dict = {}
+        for window in dv_normed_windows:
+            fname = os.path.join(self.predata_dir, seq, 'dv_normed_%d_gt.csv' % window)
+            val = np.loadtxt(fname, delimiter=',')
+            val = torch.from_numpy(val).cuda()
+            dv_normed_dict[str(window)] = val
 
 
         ## GET Range
@@ -80,21 +111,18 @@ class DGADataset(Dataset):
         # print('%s mode -- crop [%d, %d)' % (self.mode, n0, nend))
 
         ## CROP
-        us      = us[n0: nend]
-        gt      = gt[n0: nend]
-        dw_16   = dw_16[n0: nend]
-        a_gt    = a_gt[n0: nend]
-        for key, value in gt_dv_normed.items():
-            gt_dv_normed[key] = value[n0:nend]
+        ts       = ts[n0: nend]
+        us       = us[n0: nend]
+        q_gt     = q_gt[n0:nend]
+        dv_16_gt = dv_16_gt[n0: nend]
+        dv_32_gt = dv_32_gt[n0: nend]
+        for key, value in dv_normed_dict.items():
+            dv_normed_dict[key] = value[n0:nend]
 
         if self.mode == 'train':
             assert us.shape[0] == self.N
-            assert gt.shape[0] == self.N
-            assert dw_16.shape[0] == self.N
-            for key, value in gt_dv_normed.items():
-                assert value.shape[0] == self.N
 
-        return seq, us, gt, dw_16, a_gt, gt_dv_normed
+        return seq, us, q_gt, dv_16_gt, dv_32_gt, dv_normed_dict
 
     def __len__(self):
         return len(self.seq_dict[self.mode])

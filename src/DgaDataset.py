@@ -108,7 +108,6 @@ class DgaDataset(Dataset):
         q_gt = torch.Tensor(gt_interpolated[:, 4:8]).double()
         q_gt = q_gt / q_gt.norm(dim=1, keepdim=True)
         Rot_gt = SO3.from_quaternion(q_gt.cuda(), ordering='wxyz').cpu()
-        Rot_gt = SO3.dnormalize(Rot_gt.cuda())
 
         w_gt_path = os.path.join(self.predata_dir, seq, 'w_gt.csv')
         if not os.path.exists(w_gt_path):
@@ -116,12 +115,12 @@ class DgaDataset(Dataset):
             w_gt = SO3.dnormalize(w_gt.double())
             w_gt = SO3.log(w_gt)
             w_gt = w_gt.cpu().numpy() / self.dt
-            print('w_gt:',w_gt.shape, w_gt.dtype)
+            print('Preprocess %s/w_gt:'%seq ,w_gt.shape, w_gt.dtype)
             np.savetxt(w_gt_path, w_gt, delimiter=',')
 
         imu_path = os.path.join(self.predata_dir, seq, 'imu.csv')
         if not os.path.exists(imu_path):
-            print('imu:',imu.shape, imu.dtype)
+            print('Preprocess %s/imu:'%seq, imu.shape, imu.dtype)
             np.savetxt(imu_path, imu, delimiter=',')
 
         dw_16_gt_path = os.path.join(self.predata_dir, seq, 'dw_16_gt.csv')
@@ -130,7 +129,7 @@ class DgaDataset(Dataset):
             dw_16_gt = SO3.dnormalize(dw_16_gt.double())
             dw_16_gt = SO3.log(dw_16_gt)
             dw_16_gt = dw_16_gt.cpu().numpy()
-            print('dw_16_gt:',dw_16_gt.shape, dw_16_gt.dtype)
+            print('Preprocess %s/dw_16_gt:'%seq, dw_16_gt.shape, dw_16_gt.dtype)
             np.savetxt(dw_16_gt_path, dw_16_gt, delimiter=',')
 
         dw_32_gt_path = os.path.join(self.predata_dir, seq, 'dw_32_gt.csv')
@@ -139,13 +138,13 @@ class DgaDataset(Dataset):
             dw_32_gt = SO3.dnormalize(dw_32_gt.double())
             dw_32_gt = SO3.log(dw_32_gt)
             dw_32_gt = dw_32_gt.cpu().numpy()
-            print('dw_32_gt:',dw_32_gt.shape, dw_32_gt.dtype)
+            print('Preprocess %s/dw_32_gt:'%seq, dw_32_gt.shape, dw_32_gt.dtype)
             np.savetxt(dw_32_gt_path, dw_32_gt, delimiter=',')
 
         q_gt_path = os.path.join(self.predata_dir, seq, 'q_gt.csv')
         if not os.path.exists(q_gt_path):
             q_gt = q_gt.cpu().numpy()
-            print('q_gt:',q_gt.shape, q_gt.dtype)
+            print('Preprocess %s/q_gt:'%seq, q_gt.shape, q_gt.dtype)
             np.savetxt(q_gt_path, q_gt, delimiter=',')
 
         if False: # gt quat 확인

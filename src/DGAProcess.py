@@ -38,6 +38,7 @@ class LearningProcess:
         self.figsize = (20, 12)
         self.dt = 0.005 # (s)
         self.id = params['id']
+        self.predata_dir = params['dataset']['predata_dir']
 
         self.preprocess()
 
@@ -64,21 +65,36 @@ class LearningProcess:
         all_seqs = [*self.params['dataset']['train_seqs'], *self.params['dataset']['test_seqs']]
         all_seqs.sort()
         dt = 0.005
-        dv_windows = [16, 32, 64] #
         dv_normed_windows = [16, 32, 64, 128, 256, 512] #
+
+        def interpolate(x, t, t_int):
+            """
+            Interpolate ground truth at the sensor timestamps
+            """
+
+            # vector interpolation
+            x_int = np.zeros((t_int.shape[0], x.shape[1]))
+            for i in range(x.shape[1]):
+                if i in [4, 5, 6, 7]:
+                    continue
+                x_int[:, i] = np.interp(t_int, t, x[:, i])
+            # quaternion interpolation
+            t_int = torch.Tensor(t_int - t[0])
+            t = torch.Tensor(t - t[0])
+            qs = SO3.qnorm(torch.Tensor(x[:, 4:8]))
+            qs = SO3.qinterp(qs, t, t_int)
+            qs = SO3.qnorm(qs)
+            x_int[:, 4:8] = qs.numpy()
+            return x_int
 
         for seq in all_seqs:
             _seq_dir = os.path.join(self.params['dataset']['predata_dir'], seq)
-            if os.path.exists(_seq_dir):
-                print('  %s is already pre-processed.' % seq)
-                continue
-            else:
-                print('  %s is being pre-processed' % seq)
+            if not os.path.exists(_seq_dir):
                 os.makedirs(_seq_dir)
+
 
             path_imu = os.path.join(self.params['dataset']['data_dir'], seq, "mav0", "imu0", "data.csv")
             imu = np.genfromtxt(path_imu, delimiter=",", skip_header=1)
-
             path_gt = os.path.join(self.params['dataset']['data_dir'], seq, "mav0", "state_groundtruth_estimate0", "data.csv")
             gt = np.genfromtxt(path_gt, delimiter=",", skip_header=1)
 
@@ -99,25 +115,6 @@ class LearningProcess:
             gt = gt[idx0_gt: idx_end_gt]
             ts = imu[:, 0]/1e9
 
-            def interpolate(x, t, t_int):
-                """
-                Interpolate ground truth at the sensor timestamps
-                """
-
-                # vector interpolation
-                x_int = np.zeros((t_int.shape[0], x.shape[1]))
-                for i in range(x.shape[1]):
-                    if i in [4, 5, 6, 7]:
-                        continue
-                    x_int[:, i] = np.interp(t_int, t, x[:, i])
-                # quaternion interpolation
-                t_int = torch.Tensor(t_int - t[0])
-                t = torch.Tensor(t - t[0])
-                qs = SO3.qnorm(torch.Tensor(x[:, 4:8]))
-                qs = SO3.qinterp(qs, t, t_int)
-                qs = SO3.qnorm(qs)
-                x_int[:, 4:8] = qs.numpy()
-                return x_int
 
             gt_interpolated = interpolate(gt, gt[:, 0]/1e9, ts)
             gt_interpolated[:, 0] = imu[:, 0]
@@ -139,8 +136,6 @@ class LearningProcess:
 
             # take pseudo ground truth accerelation
             print('v_gt:', v_gt.shape, v_gt.dtype, v_gt.device)
-            a_gt = (v_gt[1:] - v_gt[:-1]) / (dt)
-            a_gt = torch.cat([a_gt[0].unsqueeze(0), (a_gt[1:] + a_gt[:-1]) / 2.0, a_gt[-1].unsqueeze(0)])
             print('a_gt:', a_gt.shape, a_gt.dtype, a_gt.device)
 
             # compute pre-integration factors for all training
@@ -148,14 +143,7 @@ class LearningProcess:
             dRot_ij = bmtm(Rot_gt[:-mtf], Rot_gt[mtf:])
             dRot_ij = SO3.dnormalize(dRot_ij.cuda())
             dxi_ij = SO3.log(dRot_ij).cpu()
-            # print("\tdxi_ij -- ", dxi_ij.shape, dxi_ij.dtype) # [29976, 3]
 
-
-            ## COMPUTE gt_dv, gt_dv_normed
-            v_gt = v_gt.cuda() # torch.Size([N, 3]) torch.float64 cuda:0
-            _gt_dv = {}
-            for window_size in dv_windows:
-                _gt_dv[str(window_size)] = v_gt[window_size:] - v_gt[:-window_size]
 
             _gt_dv_normed = {}
             for window_size in dv_normed_windows:
@@ -189,50 +177,95 @@ class LearningProcess:
 
 
             ## SAVE
-            _data_path = os.path.join(_seq_dir, 'data.pt')
-            _data_dict = {
-                'ts': imu[:, 0].float(),
-                'us': imu[:, 1:].float() }
-            torch.save(_data_dict, _data_path)
+            imu_path = os.path.join(_seq_dir, 'imu.csv')
+            if not os.path.exists(imu_path):
+                print('preprocess/%s/imu:'%seq, imu.shape, imu.dtype)
+                np.savetxt(imu_path, imu, delimiter=',')
 
-            _gt_path = os.path.join(_seq_dir, 'gt.pt')
-            _gt_dict = {
-                'gt_interpolated': gt_interpolated.float(),
-                'dw_16': dxi_ij.float(), # the 16-size window's euler angle difference
-                'a_gt': a_gt.float(),
-            }
-            torch.save(_gt_dict, _gt_path)
+            q_gt_path = os.path.join(_seq_dir, 'q_gt.csv')
+            if not os.path.exists(q_gt_path):
+                print('preprocess/%s/q_gt:'%seq, q_gt.shape, q_gt.dtype)
+                np.savetxt(q_gt_path, q_gt, delimiter=',')
 
-            _gt_dv_path = os.path.join(_seq_dir, 'dv.pt')
-            _gt_dv_dict = {
-                'dv': {
-                    '16': _gt_dv['16'].float(),
-                    '32': _gt_dv['32'].float(),
-                    '64': _gt_dv['64'].float(),
-                },
-                'dv_normed': {
-                    '16':   _gt_dv_normed['16'].float(),
-                    '32':   _gt_dv_normed['32'].float(),
-                    '64':   _gt_dv_normed['64'].float(),
-                    '128':  _gt_dv_normed['128'].float(),
-                    '256':  _gt_dv_normed['256'].float(),
-                    '512':  _gt_dv_normed['512'].float(),
-                }
-            }
-            torch.save(_gt_dv_dict, _gt_dv_path)
+            w_gt_path = os.path.join(self.predata_dir, seq, 'w_gt.csv')
+            if not os.path.exists(w_gt_path):
+                w_gt = bmtm(Rot_gt[:-1], Rot_gt[1:])
+                w_gt = SO3.dnormalize(w_gt.double())
+                w_gt = SO3.log(w_gt)
+                w_gt = w_gt.cpu().numpy() / self.dt
+                print('preprocess/%s/w_gt:'%seq, w_gt.shape, w_gt.dtype)
+                np.savetxt(w_gt_path, w_gt, delimiter=',')
 
-            ## CHECK
-            if self.params['debug']:
-                def print_dict(d:dict):
-                    for k, v in d.items():
-                        if type(v) is dict:
-                            print('  %s:' % k)
-                            print_dict(v)
-                        else:
-                            print('    %s:' % k, type(v), v.shape, v.dtype)
-                print_dict(_data_dict)
-                print_dict(_gt_dict)
-                print_dict(_gt_dv_dict)
+            a_gt_path = os.path.join(self.predata_dir, seq, 'a_gt.csv')
+            if not os.path.exists(a_gt_path):
+                a_gt = (v_gt[1:] - v_gt[:-1]) / (dt)
+                a_gt = torch.cat([
+                    a_gt[0].unsqueeze(0),
+                    (a_gt[1:] + a_gt[:-1]) / 2.0,
+                    a_gt[-1].unsqueeze(0)
+                ])
+                print('preprocess/%s/a_gt:'%seq, a_gt.shape, a_gt.dtype, a_gt.device)
+                np.savetxt(a_gt_path, a_gt, delimiter=',')
+
+            dw_16_gt_path = os.path.join(self.predata_dir, seq, 'dw_16_gt.csv')
+            if not os.path.exists(dw_16_gt_path):
+                dw_16_gt = bmtm(Rot_gt[:-16], Rot_gt[16:])
+                dw_16_gt = SO3.dnormalize(dw_16_gt.double())
+                dw_16_gt = SO3.log(dw_16_gt)
+                dw_16_gt = dw_16_gt.cpu().numpy()
+                print('preprocess/%s/dw_16_gt:'%seq, dw_16_gt.shape, dw_16_gt.dtype)
+                np.savetxt(dw_16_gt_path, dw_16_gt, delimiter=',')
+
+            dw_32_gt_path = os.path.join(self.predata_dir, seq, 'dw_32_gt.csv')
+            if not os.path.exists(dw_32_gt_path):
+                dw_32_gt = bmtm(Rot_gt[:-32], Rot_gt[32:])
+                dw_32_gt = SO3.dnormalize(dw_32_gt.double())
+                dw_32_gt = SO3.log(dw_32_gt)
+                dw_32_gt = dw_32_gt.cpu().numpy()
+                print('preprocess/%s/dw_32_gt:'%seq, dw_32_gt.shape, dw_32_gt.dtype)
+                np.savetxt(dw_32_gt_path, dw_32_gt, delimiter=',')
+
+            dv_16_gt_path = os.path.join(self.predata_dir, seq, 'dv_16_gt.csv')
+            if not os.path.exists(dv_16_gt_path):
+                dv_16_gt = v_gt[:16] - v_gt[:-16]
+                dv_16_gt = dv_16_gt.cpu().numpy()
+                print('preprocess/%s/dv_16_gt:'%seq, dv_16_gt.shape, dv_16_gt.dtype)
+                np.savetxt(dv_16_gt_path, dv_16_gt, delimiter=',')
+
+            dv_32_gt_path = os.path.join(self.predata_dir, seq, 'dv_32_gt.csv')
+            if not os.path.exists(dv_32_gt_path):
+                dv_32_gt = v_gt[:32] - v_gt[:-32]
+                dv_32_gt = dv_32_gt.cpu().numpy()
+                print('preprocess/%s/dv_32_gt:'%seq, dv_32_gt.shape, dv_32_gt.dtype)
+                np.savetxt(dv_32_gt_path, dv_32_gt, delimiter=',')
+
+            for key, val in _gt_dv_normed.items():
+                _path = os.path.join(self.predata_dir, seq, 'dv_normed_%s_gt.csv' % key)
+                if not os.path.exists(_path):
+                    _item = val.cpu().numpy()
+                    print('preprocess/%s/dv_normed_%s_gt:'%(key,seq), _item.shape, _item.dtype)
+                    np.savetxt(_path, _item, delimiter=',')
+
+            # _gt_path = os.path.join(_seq_dir, 'gt.pt')
+            # _gt_dict = {
+            #     'gt_interpolated': gt_interpolated.float(),
+            #     'dw_16': dxi_ij.float(), # the 16-size window's euler angle difference
+            #     'a_gt': a_gt.float(),
+            # }
+            # torch.save(_gt_dict, _gt_path)
+
+            # _gt_dv_path = os.path.join(_seq_dir, 'dv.pt')
+            # _gt_dv_dict = {
+            #     'dv_normed': {
+            #         '16':   _gt_dv_normed['16'].float(),
+            #         '32':   _gt_dv_normed['32'].float(),
+            #         '64':   _gt_dv_normed['64'].float(),
+            #         '128':  _gt_dv_normed['128'].float(),
+            #         '256':  _gt_dv_normed['256'].float(),
+            #         '512':  _gt_dv_normed['512'].float(),
+            #     }
+            # }
+            # torch.save(_gt_dv_dict, _gt_dv_path)
 
         print("--- success ---")
         """
@@ -431,24 +464,26 @@ class LearningProcess:
         """Forward-backward loop over training data"""
         loss_epoch = 0
         optimizer.zero_grad()
-        for seq, us, gt, dw_16, a_gt, dv_normed in dataloader:
+        for seq, us, q_gt, dv_16_gt, dv_32_gt, dv_normed_dict in dataloader:
             us = dataloader.dataset.add_noise(us)
-            # print('  us:', us.shape, us.dtype, us.device)
-            q_gt = gt[:, :, 4:8].reshape(-1, 4)
+
+            q_gt = q_gt.reshape(-1, 4)
             rot_gt = SO3.from_quaternion(q_gt.cuda())
             rot_gt = rot_gt.reshape(us.shape[0], us.shape[1], 3, 3)
 
-            w_hat, a_hat = self.net(us, rot_gt)
-            gloss, acc_loss, gap_loss = criterion(w_hat, dw_16, a_hat, dv_normed)
+            # if self.params['net_version'] == 'ver1':
+            #     w_hat, a_hat = self.net(us, rot_gt)
+            #     gloss, acc_loss, gap_loss = criterion(w_hat, dw_16, a_hat, dv_normed)
+            # elif self.params['net_version'] == 'ver2':
+
+            a_hat = self.net(us, rot_gt)
+            loss = criterion()
+
             loss = (gloss + acc_loss + gap_loss)/len(dataloader)
             loss.backward()
-
-            # for name, param in self.net.named_parameters():
-            #     if param.grad is not None:
-            #         print(name, torch.isfinite(param.grad).all())
-
             loss_epoch += loss.detach().cpu()
             # print('train_loss:', loss.detach().cpu().item())
+
         optimizer.step()
         return loss_epoch
 
@@ -462,7 +497,7 @@ class LearningProcess:
         self.net.eval()
         with torch.no_grad():
             for i in range(len(dataset)):
-                seq, us, gt, dw_16, a_gt, dv_normed = dataset[i]
+                seq, us, q_gt, dv_16_gt, dv_32_gt, dv_normed_dict = dataset[i]
                 q_gt = gt[:, 4:8]
                 rot_gt = SO3.from_quaternion(q_gt.cuda())
                 rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
@@ -488,7 +523,7 @@ class LearningProcess:
         self.net.eval()
 
         for i in range(len(dataset)):
-            seq, us, gt, dw_16, a_gt, dv_normed = dataset[i]
+            seq, us, q_gt, dv_16_gt, dv_32_gt, dv_normed_dict = dataset[i]
             q_gt = gt[:, 4:8]
             rot_gt = SO3.from_quaternion(q_gt.cuda())
             rot_gt = rot_gt.reshape(us.shape[0], 3, 3)

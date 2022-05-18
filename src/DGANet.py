@@ -2,7 +2,7 @@ import sys
 if sys.platform.startswith('win'):
     sys.path.append(r"C:\Users\leech\Desktop\imu_ws\denoise-imu-gyro") # My window workspace path
 elif sys.platform.startswith('linux'):
-    sys.path.append('/root/denoise')
+    sys.path.append('/home/leecw/project')
 
 import torch
 import matplotlib.pyplot as plt
@@ -142,7 +142,7 @@ class DGANet(torch.nn.Module):
 class DGANetVer2(torch.nn.Module):
     """
         - Body frame과 World frame에 대하여 잡음이 모두 존재할거라는 가정
-        - Accel만 추정하는 걸로
+        - Accel만 추정
     """
     def __init__(self, params):
         super().__init__()
@@ -151,7 +151,7 @@ class DGANetVer2(torch.nn.Module):
         net_params = params['net']
 
         self.in_dim  = net_params['in_dim']
-        self.out_dim = net_params['out_dim']
+        self.out_dim = 6
         self.dropout = net_params['dropout']
         self.momentum= net_params['momentum']
         self.gyro_std = net_params['gyro_std']
@@ -194,7 +194,6 @@ class DGANetVer2(torch.nn.Module):
 
         ### Parameter member variables
         # Trainable
-        self.C_w = torch.nn.Parameter(torch.randn(3, 3)*5e-2)
         self.C_a = torch.nn.Parameter(torch.randn(3, 3)*5e-2)
         # Not trainable
         self.mean_u     = torch.nn.Parameter(torch.zeros(self.in_dim),      requires_grad=False)
@@ -243,32 +242,20 @@ class DGANetVer2(torch.nn.Module):
 
         x = self.conv5(x)
         x = x.transpose(1, 2)
-        w_tilde = x[:, :, 0:3]
-        a_tilde = x[:, :, 3:6]
-
-        # Gyro -- Post-process
-        C_w = (self.I3 + self.C_w).expand(us.shape[0], us.shape[1], 3, 3)
-        Rot_us = bbmv(C_w, w_imu)
-        w_hat = self.gyro_std * w_tilde + Rot_us
-        # Rot_us: torch.Size([6, 16000, 3]) torch.float32
-        # w_tilde: torch.Size([6, 16000, 3]) torch.float32
-        # w_hat: torch.Size([6, 16000, 3]) torch.float32
+        a_tilde_b = x[:, :, 0:3]
+        a_tilde_w = x[:, :, 3:6]
 
         ## Acc -- Post-process
         C_a = (self.I3 + self.C_a).expand(us.shape[0], us.shape[1], 3, 3)
 
         a_imu = bbmv(C_a, a_imu)
-        a_hat = a_imu + self.acc_std * a_tilde
-        a_hat = bbmv(rot_gt, a_hat)
-        a_hat -= self.g
+        a_hat = a_imu - self.acc_std * a_tilde_b
+        print('a_w:', bbmv(rot_gt, a_hat).shape)
+        print('a_t_w:', a_tilde_w.shape)
+        print('self.g:', self.g)
+        a_hat = bbmv(rot_gt, a_hat) - a_tilde_w - self.g
 
-        # print("a_hat:", a_hat.shape, a_hat.dtype)
-            # C_a: torch.Size([6, 16000, 3, 3]) torch.float32
-            # a_imu: torch.Size([6, 16000, 3]) torch.float32
-            # self.acc_std: torch.Size([3]) torch.float32
-            # a_tilde: torch.Size([6, 16000, 3]) torch.float32
-            # a_hat: torch.Size([6, 16000, 3]) torch.float32
-        return w_hat, a_hat
+        return a_hat
 
 params = {
     'net': {
@@ -286,17 +273,29 @@ params = {
 
 if __name__ == "__main__":
 
-    net = DGANet(params).cuda()
-    print(net)
-
     input = torch.randn((1, 16000, 6)).cuda()
     rot   = torch.randn((1, 16000, 3, 3)).cuda()
     print(input.shape)
 
-    net.eval()
-    w_hat, a_hat = net(input, rot)
+    # Test DGANet
+    if False:
+        net = DGANet(params).cuda()
+        print(net)
 
-    w_hat = w_hat.cpu().detach()
-    a_hat = a_hat.cpu().detach()
-    print("w_hat:", w_hat.shape, w_hat.dtype, w_hat.device, w_hat.requires_grad)
-    print("a_hat:", a_hat.shape, a_hat.dtype, a_hat.device, a_hat.requires_grad)
+        net.eval()
+        w_hat, a_hat = net(input, rot)
+
+        w_hat = w_hat.cpu().detach()
+        a_hat = a_hat.cpu().detach()
+        print("w_hat:", w_hat.shape, w_hat.dtype, w_hat.device, w_hat.requires_grad)
+        print("a_hat:", a_hat.shape, a_hat.dtype, a_hat.device, a_hat.requires_grad)
+
+    # Test DGANetVer2
+    if True:
+        net = DGANetVer2(params).cuda()
+        print(net)
+
+        net.eval()
+        a_hat = net(input, rot)
+        a_hat = a_hat.cpu().detach()
+        print("a_hat:", a_hat.shape, a_hat.dtype, a_hat.device, a_hat.requires_grad)

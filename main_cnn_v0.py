@@ -5,15 +5,15 @@ import torch
 from src.DGAProcess import LearningProcess
 
 from src.DGALoss import DGALoss
-from src.DGANet import DGANet
+from src.DGANet import DGANet, DGANetVer2
 
 from termcolor import cprint
 
 
 import argparse
-parser = argparse.ArgumentParser(description='Process some integers.')
-parser.add_argument('--debug', type=bool, default=False)
+parser = argparse.ArgumentParser()
 parser.add_argument('--mode', type=str, default='train')
+parser.add_argument('--net_version', type=str, default='ver1')
 parser.add_argument('--id', type=str, default=None)
 parser.add_argument('--c0', type=int, default=16)
 parser.add_argument('--lr', type=float, default=0.01)
@@ -22,9 +22,13 @@ parser.add_argument('--dv_normed', nargs='+', type=int, default=[32, 64])
 args = parser.parse_args()
 print(args.__dict__)
 
+if args.net_version == 'ver1':
+    Net = DGANet
+elif args.net_version == 'ver2':
+    Net = DGANetVer2
 
 params = {
-    'debug': args.debug,
+    'net_version': args.net_version,
     'result_dir': os.path.join('/root/project/results/DenoiseIMU', args.id),
     'test_dir': os.path.join('/root/project/results/DenoiseIMU', args.id, 'tests'),
     'id': args.id,
@@ -61,7 +65,7 @@ params = {
         'v_window': 16,
     },
 
-    'net_class': DGANet,
+    'net_class': Net,
     'net': {
         'in_dim': 6,
         'out_dim': 6,
@@ -71,7 +75,7 @@ params = {
         'ds': [4, 4, 4],
         'momentum': 0.1,
         'gyro_std': [1*np.pi/180, 2*np.pi/180, 5*np.pi/180],
-        'acc_std': [2.0e-3, 2.0e-3, 2.0e-3], #? Is this proper range ?#
+        'acc_std': [1.0e-2, 1.0e-3, 1.0e-2], #? Is this proper range ?#
     },
 
     'train': {
