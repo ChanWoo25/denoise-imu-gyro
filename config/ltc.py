@@ -40,7 +40,7 @@ def parse():
 
 
 def configure():
-
+    args = parse()
     print(args.__dict__)
 
     euroc_data_dir = os.path.join('/root', 'project', 'datasets', 'EUROC')

@@ -238,9 +238,45 @@ class DGALossVer2(torch.nn.Module):
         loss = self.w * self.sl(rs/self.huber, torch.zeros_like(rs)) * (self.huber**2)
         return loss
 
+    def dv_loss(self, a_hat, dv_16, dv_32):
+        v_hat = fast_acc_integration(a_hat)
+        dv_16_hat = v_hat[:, 16:] - v_hat[:, :-16]
+        dv_32_hat = v_hat[:, 32:] - v_hat[:, :-32]
+
+        dv_16_loss = self.sl(dv_16, dv_16_hat)
+        dv_16_loss = torch.sum(dv_16_loss)
+
+        dv_32_loss = self.sl(dv_32, dv_32_hat)
+        dv_32_loss = torch.sum(dv_32_loss)
+
+        return dv_16_loss, dv_32_loss
+
+    def dv_normed_loss(self, a_hat, gt_dv_normed):
+        v_hat = fast_acc_integration(a_hat) # torch.Size([6, 16000, 3]) True cuda:0
+
+        gt_dv_normed_keys = []
+        for key in self.dv_normed:
+            gt_dv_normed_keys.append(int(key))
+        gt_dv_normed_keys.sort()
+
+        N = a_hat.shape[1]
+        losses = {}
+
+        for window_size in gt_dv_normed_keys:
+            gt_normed_v = gt_dv_normed[str(window_size)].detach().cuda()
+            normed_v = vnorm(v_hat, window_size)
+
+            _loss = self.sln(gt_normed_v, normed_v) * np.log(window_size) * 10.0
+            _loss = _loss.mean(dim=1).sum()
+            losses[str(window_size)] = _loss
+
+        return losses
+
     def accel_loss(self, a_hat, gt_dv_normed):
         # print('# ACCEL LOSS')
         v_hat = fast_acc_integration(a_hat) # torch.Size([6, 16000, 3]) True cuda:0
+
+
         # dv_hat = (( (a_hat[:, 1:] + a_hat[:, :-1]) / 2.0) * self.dt)
         # print('dv_hat:', dv_hat.shape, dv_hat.requires_grad)
 
@@ -369,8 +405,16 @@ class DGALossVer2(torch.nn.Module):
 
         return loss, gap_loss
 
-    def forward(self, dw_16, a_hat, gt_dv_normed):
+    def forward(self, a_hat, dv_16, dv_32, gt_dv_normed_dict):
+        dv_16_loss, dv_32_loss = self.dv_loss(a_hat, dv_16, dv_32)
+        print('[Loss] dv_16(%1.6f), dv_32(%1.6f), '%(dv_16_loss.item(), dv_32_loss.item()), end='')
+        loss = dv_16_loss + dv_32_loss
 
-        acc_loss, gap_loss = self.accel_loss(a_hat, gt_dv_normed)
-        return gloss, acc_loss, gap_loss
+        dv_noremd_losses = self.dv_normed_loss(a_hat, gt_dv_normed_dict)
+        for key, val in dv_noremd_losses.items():
+            print('%s(%1.6f), ' % (key, val.item()), end='')
+            loss += val
+        print()
+
+        return loss
 

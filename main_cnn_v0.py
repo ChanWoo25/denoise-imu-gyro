@@ -4,7 +4,7 @@ import torch
 
 from src.DGAProcess import LearningProcess
 
-from src.DGALoss import DGALoss
+from src.DGALoss import DGALoss, DGALossVer2
 from src.DGANet import DGANet, DGANetVer2
 
 from termcolor import cprint
@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--mode', type=str, default='train')
 parser.add_argument('--net_version', type=str, default='ver1')
 parser.add_argument('--id', type=str, default=None)
+parser.add_argument('--machine', type=str, default='server')
 parser.add_argument('--c0', type=int, default=16)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--dv', nargs='+', type=int, default=[16, 32])
@@ -22,15 +23,28 @@ parser.add_argument('--dv_normed', nargs='+', type=int, default=[32, 64])
 args = parser.parse_args()
 print(args.__dict__)
 
+euroc_data_dir, ltc_results_dir = None, None
+if args.machine == 'server':
+    euroc_data_dir = os.path.join('/home/leecw', 'project', 'datasets', 'EUROC')
+    results_dir = os.path.join('/home/leecw', 'project', 'results', 'DenoiseIMU')
+elif args.machine == 'docker':
+    euroc_data_dir = os.path.join('/root', 'project', 'datasets', 'EUROC')
+    results_dir = os.path.join('/root', 'project', 'results', 'DenoiseIMU')
+
+
+
+
 if args.net_version == 'ver1':
     Net = DGANet
+    Loss = DGALoss
 elif args.net_version == 'ver2':
     Net = DGANetVer2
+    Loss = DGALossVer2
 
 params = {
     'net_version': args.net_version,
-    'result_dir': os.path.join('/root/project/results/DenoiseIMU', args.id),
-    'test_dir': os.path.join('/root/project/results/DenoiseIMU', args.id, 'tests'),
+    'result_dir': os.path.join(results_dir, args.id),
+    'test_dir': os.path.join(results_dir, args.id, 'tests'),
     'id': args.id,
 
     'dataset': {
@@ -57,8 +71,8 @@ params = {
             'V1_01_easy',
         ],
         # size of trajectory during training
-        'data_dir':     "/root/project/datasets/EUROC",
-        'predata_dir':  os.path.join('/root/project/results/DenoiseIMU/predata'),
+        'data_dir':     euroc_data_dir,
+        'predata_dir':  os.path.join(results_dir, 'predata'),
         'N': 32 * 500, # should be integer * 'max_train_freq'
         'min_train_freq': 16,
         'max_train_freq': 32,
@@ -85,7 +99,7 @@ params = {
             'weight_decay': 1e-1,
             'amsgrad': False,
         },
-        'loss_class': DGALoss,
+        'loss_class': Loss,
         'loss': {
             'min_N': 4, # int(np.log2(dataset_params['min_train_freq'])),
             'max_N': 5, # int(np.log2(dataset_params['max_train_freq'])),
@@ -109,9 +123,9 @@ params = {
         },
 
         # frequency of validation step
-        'freq_val': 40,
+        'freq_val': 20,
         # total number of epochs
-        'n_epochs': 1600,
+        'n_epochs': 800,
     }
 }
 

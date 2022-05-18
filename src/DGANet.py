@@ -146,7 +146,7 @@ class DGANetVer2(torch.nn.Module):
     """
     def __init__(self, params):
         super().__init__()
-        print('\n# Initilaize DGANet ...')
+        print('\n# Initilaize DGANetVer2 ...')
 
         net_params = params['net']
 
@@ -250,9 +250,9 @@ class DGANetVer2(torch.nn.Module):
 
         a_imu = bbmv(C_a, a_imu)
         a_hat = a_imu - self.acc_std * a_tilde_b
-        print('a_w:', bbmv(rot_gt, a_hat).shape)
-        print('a_t_w:', a_tilde_w.shape)
-        print('self.g:', self.g)
+        # print('a_w:', bbmv(rot_gt, a_hat).shape)
+        # print('a_t_w:', a_tilde_w.shape)
+        # print('self.g:', self.g)
         a_hat = bbmv(rot_gt, a_hat) - a_tilde_w - self.g
 
         return a_hat

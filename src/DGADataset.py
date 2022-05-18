@@ -68,13 +68,13 @@ class DGADataset(Dataset):
 
         fname = os.path.join(self.predata_dir, seq, 'imu.csv')
         imu = np.loadtxt(fname, delimiter=',')
-        imu = torch.from_numpy(imu).cuda()
+        imu = torch.from_numpy(imu).cuda().float()
         ts = imu[:, 0]
         us = imu[:, 1:]
 
         fname = os.path.join(self.predata_dir, seq, 'q_gt.csv')
         q_gt = np.loadtxt(fname, delimiter=',')
-        q_gt = torch.from_numpy(q_gt).cuda()
+        q_gt = torch.from_numpy(q_gt).cuda().float()
 
         # fname = os.path.join(self.predata_dir, seq, 'w_gt.csv')
         # w_gt = np.loadtxt(fname, delimiter=',')
@@ -82,23 +82,23 @@ class DGADataset(Dataset):
 
         fname = os.path.join(self.predata_dir, seq, 'dv_16_gt.csv')
         dv_16_gt = np.loadtxt(fname, delimiter=',')
-        dv_16_gt = torch.from_numpy(dv_16_gt).cuda()
+        dv_16_gt = torch.from_numpy(dv_16_gt).cuda().float()
 
         fname = os.path.join(self.predata_dir, seq, 'dv_32_gt.csv')
         dv_32_gt = np.loadtxt(fname, delimiter=',')
-        dv_32_gt = torch.from_numpy(dv_32_gt).cuda()
+        dv_32_gt = torch.from_numpy(dv_32_gt).cuda().float()
 
         dv_normed_windows = [16, 32, 64, 128, 256, 512] #
         dv_normed_dict = {}
         for window in dv_normed_windows:
             fname = os.path.join(self.predata_dir, seq, 'dv_normed_%d_gt.csv' % window)
             val = np.loadtxt(fname, delimiter=',')
-            val = torch.from_numpy(val).cuda()
+            val = torch.from_numpy(val).cuda().float()
             dv_normed_dict[str(window)] = val
 
 
         ## GET Range
-        N_max = dw_16.shape[0]
+        N_max = dv_32_gt.shape[0]
         if self.mode == 'train': # random start
             _max = N_max - self.N
             n0 = torch.randint(0, _max, (1, ))
@@ -114,8 +114,8 @@ class DGADataset(Dataset):
         ts       = ts[n0: nend]
         us       = us[n0: nend]
         q_gt     = q_gt[n0:nend]
-        dv_16_gt = dv_16_gt[n0: nend]
-        dv_32_gt = dv_32_gt[n0: nend]
+        dv_16_gt = dv_16_gt[n0: nend-16]
+        dv_32_gt = dv_32_gt[n0: nend-32]
         for key, value in dv_normed_dict.items():
             dv_normed_dict[key] = value[n0:nend]
 
@@ -162,33 +162,35 @@ class DGADataset(Dataset):
 
         # Compute mean
         n_data = 0
-        mean_seqs = torch.zeros(6)
-        print('mean_seqs:', mean_seqs.shape, mean_seqs.dtype, mean_seqs.device)
+        mean_seqs = torch.zeros(6).cuda()
         for seq in seqs:
-            _data_path = os.path.join(self.predata_dir, seq, 'data.pt')
-            us = torch.load(_data_path)['us']
+            fname = os.path.join(self.predata_dir, seq, 'imu.csv')
+            imu = np.loadtxt(fname, delimiter=',')
+            imu = torch.from_numpy(imu).cuda()
+            us = imu[:, 1:]
             mean_seqs += us.sum(dim=0)
             n_data    += us.shape[0]
         mean_seqs = mean_seqs / n_data
-        print('mean_seqs:', mean_seqs.shape, mean_seqs.dtype, mean_seqs.device)
+        # print('mean_seqs:', mean_seqs.shape, mean_seqs.dtype, mean_seqs.device)
 
         # Compute standard deviation
-        std_u = torch.zeros(6)
-        print('std_u:', std_u.shape, std_u.dtype, std_u.device)
+        std_u = torch.zeros(6).cuda()
         for seq in seqs:
-            _data_path = os.path.join(self.predata_dir, seq, 'data.pt')
-            us = torch.load(_data_path)['us']
+            fname = os.path.join(self.predata_dir, seq, 'imu.csv')
+            imu = np.loadtxt(fname, delimiter=',')
+            imu = torch.from_numpy(imu).cuda()
+            us = imu[:, 1:]
             std_u += ((us - mean_seqs) ** 2).sum(dim=0)
         std_u = (std_u / n_data).sqrt()
-        print('std_u:', std_u.shape, std_u.dtype, std_u.device)
+        # print('std_u:', std_u.shape, std_u.dtype, std_u.device)
 
+        mean_seqs = mean_seqs.cpu().float()
+        std_u = std_u.cpu().float()
         nf = {
             'mean_u': mean_seqs,
             'std_u': std_u,
             'seqs': seqs
         }
-        print('- mean_u    :', mean_seqs)
-        print('- std_u     :', std_u)
         torch.save(nf, self.nf_path)
         return mean_seqs, std_u
 
