@@ -540,6 +540,34 @@ class LearningProcess:
                 a_hat, a_tilde_b = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0), mode='test')
 
                 ### Plot hist body
+                def plot_tilde_distribution(data:np.ndarray, seq, fname):
+                    x, y, z = data[:, 0], data[:, 1], data[:, 2]
+                    _mean = np.mean(data, axis=0)
+                    _std  = np.std(data, axis=0)
+                    fig, ax = plt.subplots(3, 1, figsize=(21, 12), dpi=200)
+                    fig.suptitle('%s a_tilde_body Distribution / %s / %s' % (self.params['net_version'], seq, self.id), fontsize=20)
+
+                    ax[0].hist(x, bins = 100, range=(x.min(), x.max()), label='x')
+                    ax[0].set_ylabel("X axis frequency")
+                    ax[0].legend()
+
+                    ax[1].hist(y, bins = 100, range=(y.min(), y.max()), label='y')
+                    ax[1].set_ylabel("Y axis frequency")
+                    ax[1].legend()
+
+                    ax[2].hist(z, bins = 100, range=(z.min(), z.max()), label='z')
+                    ax[2].set_ylabel("Z axis frequency")
+                    ax[2].legend()
+                    _dir  = os.path.join(self.figure_dir, seq, 'tilde_dist')
+                    _path = os.path.join(_dir, fname)
+                    if not os.path.exists(_dir):
+                        os.makedirs(_dir)
+                    self.savefig(ax, fig, _path)
+                    plt.close(fig)
+
+                    return _mean, _std
+
+
                 x = a_tilde_b.cpu().detach().numpy().squeeze()
                 fig, ax = plt.subplots(3, 1, figsize=self.figsize, dpi=200)
                 fig.suptitle('%s a_tilde_body Distribution / %s / %s' % (self.params['net_version'], seq, self.id), fontsize=20)
