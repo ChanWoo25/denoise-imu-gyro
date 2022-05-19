@@ -5,7 +5,7 @@ import torch
 from src.DGAProcess import LearningProcess
 
 from src.DGALoss import DGALoss, DGALossVer2
-from src.DGANet import DGANet, DGANetVer2
+from src.DGANet import DGANet, DGANetVer2, DGANetVer3
 
 from termcolor import cprint
 
@@ -32,13 +32,14 @@ elif args.machine == 'docker':
     results_dir = os.path.join('/root', 'project', 'results', 'DenoiseIMU')
 
 
-
-
 if args.net_version == 'ver1':
     Net = DGANet
-    Loss = DGALoss
+    Loss = DGALossVer2
 elif args.net_version == 'ver2':
     Net = DGANetVer2
+    Loss = DGALossVer2
+elif args.net_version == 'ver3':
+    Net = DGANetVer3
     Loss = DGALossVer2
 
 params = {
@@ -89,7 +90,7 @@ params = {
         'ds': [4, 4, 4],
         'momentum': 0.1,
         'gyro_std': [1*np.pi/180, 2*np.pi/180, 5*np.pi/180],
-        'acc_std': [1.0e-2, 1.0e-3, 1.0e-2], #? Is this proper range ?#
+        'acc_std': [5.0e-3, 5.0e-3, 5.0e-3], #? Is this proper range ?#
     },
 
     'train': {

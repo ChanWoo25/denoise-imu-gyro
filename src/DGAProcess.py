@@ -40,7 +40,7 @@ class LearningProcess:
         self.id = params['id']
         self.predata_dir = params['dataset']['predata_dir']
 
-        self.preprocess()
+        # self.preprocess()
 
         if mode == 'train':
             if not os.path.exists(self.params['result_dir']):
@@ -49,12 +49,13 @@ class LearningProcess:
             self.net = params['net_class'](params)
         elif mode == 'test':
             self.params = yload(params['result_dir'], 'params.yaml')
+            self.figure_dir = os.path.join('/home/leecw/project/results/DenoiseIMU', 'figures')
             self.net = params['net_class'](params)
             weights = torch.load(self.weight_path)
             self.net.load_state_dict(weights)
         else:
             self.params = yload(params['result_dir'], 'params.yaml')
-            self.figure_dir = os.path.join(self.params['result_dir'], 'figures')
+            self.figure_dir = os.path.join('/home/leecw/project/results/DenoiseIMU', 'figures')
             cprint('  No need to initialize a model', 'yellow')
             return
 
@@ -531,7 +532,109 @@ class LearningProcess:
             rot_gt = SO3.from_quaternion(q_gt.cuda())
             rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
 
-            a_hat = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0))
+            if self.params['net_version'] == 'ver1':
+                a_hat, a_tilde_b = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0), mode='test')
+
+                ### Plot hist body
+                x = a_tilde_b.cpu().detach().numpy().squeeze()
+                fig, ax = plt.subplots(3, 1, figsize=self.figsize, dpi=200)
+                fig.suptitle('%s a_tilde_body Distribution / %s / %s' % (self.params['net_version'], seq, self.id), fontsize=20)
+                ax[0].hist(x[:, 0], bins = 50, label='x')
+                ax[0].set_title("X axis frequency")
+                ax[0].legend()
+                ax[1].hist(x[:, 1], bins = 50, label='y')
+                ax[0].set_title("Y axis frequency")
+                ax[1].legend()
+                ax[2].hist(x[:, 2], bins = 50, label='z')
+                ax[0].set_title("Z axis frequency")
+                ax[2].legend()
+                _dir  = os.path.join(self.figure_dir, seq, 'tilde_dist')
+                _path = os.path.join(_dir, self.id + '_b.png')
+                if not os.path.exists(_dir):
+                    os.makedirs(_dir)
+                self.savefig(ax, fig, _path)
+                plt.close(fig)
+                ###
+
+            elif self.params['net_version'] == 'ver2':
+                a_hat, a_tilde_b, a_tilde_w = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0), mode='test')
+                print('a_hat:', a_hat.shape)
+                print('a_tilde_b:', a_tilde_b.shape)
+                print('a_tilde_w:', a_tilde_w.shape)
+
+                ### Plot hist body
+                data = a_tilde_b.cpu().detach().numpy().squeeze()
+                print('data:', data.shape)
+                x, y, z = data[:, 0], data[:, 1], data[:, 2]
+                print('x:', x.shape)
+                print(x.min(), x.max(), y.min(), y.max(), z.min(), z.max())
+                fig, ax = plt.subplots(3, 1, figsize=self.figsize, dpi=200)
+                fig.suptitle('%s a_tilde_body Distribution / %s / %s' % (self.params['net_version'], seq, self.id), fontsize=20)
+                ax[0].hist(x, bins = 100, range=(x.min(), x.max()), label='x')
+                ax[0].set_title("X axis frequency")
+                ax[0].legend()
+                ax[1].hist(y, bins = 100, range=(y.min(), y.max()), label='y')
+                ax[0].set_title("Y axis frequency")
+                ax[1].legend()
+                ax[2].hist(z, bins = 100, range=(z.min(), z.max()), label='z')
+                ax[0].set_title("Z axis frequency")
+                ax[2].legend()
+                _dir  = os.path.join(self.figure_dir, seq, 'tilde_dist')
+                _path = os.path.join(_dir, self.id + '_b.png')
+                if not os.path.exists(_dir):
+                    os.makedirs(_dir)
+                self.savefig(ax, fig, _path)
+                plt.close(fig)
+                ###
+
+                ### Plot hist world
+                data = a_tilde_w.cpu().detach().numpy().squeeze()
+                print('data:', data.shape)
+                x, y, z = data[:, 0], data[:, 1], data[:, 2]
+                print('x:', x.shape)
+                print(x.min(), x.max(), y.min(), y.max(), z.min(), z.max())
+                fig, ax = plt.subplots(3, 1, figsize=self.figsize, dpi=200)
+                fig.suptitle('%s a_tilde_world Distribution / %s / %s' % (self.params['net_version'], seq, self.id), fontsize=20)
+                ax[0].hist(x, bins = 100, range=(x.min(), x.max()), label='x')
+                ax[0].set_title("X axis frequency")
+                ax[0].legend()
+                ax[1].hist(y, bins = 100, range=(y.min(), y.max()), label='y')
+                ax[0].set_title("Y axis frequency")
+                ax[1].legend()
+                ax[2].hist(z, bins = 100, range=(z.min(), z.max()), label='z')
+                ax[0].set_title("Z axis frequency")
+                ax[2].legend()
+                _dir  = os.path.join(self.figure_dir, seq, 'tilde_dist')
+                _path = os.path.join(_dir, self.id + '_w.png')
+                if not os.path.exists(_dir):
+                    os.makedirs(_dir)
+                self.savefig(ax, fig, _path)
+                plt.close(fig)
+                ###
+
+            elif self.params['net_version'] == 'ver3':
+                a_hat, a_tilde_w = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0), mode='test')
+
+                ### Plot hist world
+                x = a_tilde_w.cpu().detach().numpy().squeeze()
+                fig, ax = plt.subplots(3, 1, figsize=self.figsize, dpi=200)
+                fig.suptitle('%s a_tilde_world Distribution / %s / %s' % (self.params['net_version'], seq, self.id), fontsize=20)
+                ax[0].hist(x[:, 0], bins = 50, label='x')
+                ax[0].set_title("X axis frequency")
+                ax[0].legend()
+                ax[1].hist(x[:, 1], bins = 50, label='y')
+                ax[0].set_title("Y axis frequency")
+                ax[1].legend()
+                ax[2].hist(x[:, 2], bins = 50, label='z')
+                ax[0].set_title("Z axis frequency")
+                ax[2].legend()
+                _dir  = os.path.join(self.figure_dir, seq, 'tilde_dist')
+                _path = os.path.join(_dir, self.id + '_w.png')
+                if not os.path.exists(_dir):
+                    os.makedirs(_dir)
+                self.savefig(ax, fig, _path)
+                plt.close(fig)
+                ###
 
             for key in dv_normed_dict:
                 dv_normed_dict[key] = dv_normed_dict[key].unsqueeze(0)
