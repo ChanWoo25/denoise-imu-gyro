@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--mode', type=str, default='train')
 parser.add_argument('--net_version', type=str, default='ver1')
 parser.add_argument('--id', type=str, default=None)
+parser.add_argument('--load_weight_path', type=str, default=None)
 parser.add_argument('--machine', type=str, default='server')
 parser.add_argument('--c0', type=int, default=16)
 parser.add_argument('--lr', type=float, default=0.01)
@@ -47,6 +48,7 @@ params = {
     'result_dir': os.path.join(results_dir, args.id),
     'test_dir': os.path.join(results_dir, args.id, 'tests'),
     'id': args.id,
+    'load_weight_path': args.load_weight_path,
 
     'dataset': {
         'train_seqs': [

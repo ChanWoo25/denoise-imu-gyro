@@ -32,6 +32,7 @@ class LearningProcess:
         """
             - Make sure that a model's in gpu after initialization.
         """
+        load_weight_path = params['load_weight_path'] # Before loading past parameters
         self.params = params
         self.weight_path = os.path.join(self.params['result_dir'], 'weights.pt')
         self.dict_test_result = {}
@@ -51,7 +52,10 @@ class LearningProcess:
             self.params = yload(params['result_dir'], 'params.yaml')
             self.figure_dir = os.path.join('/home/leecw/project/results/DenoiseIMU', 'figures')
             self.net = params['net_class'](params)
-            weights = torch.load(self.weight_path)
+            if load_weight_path is not None:
+                weights = torch.load(load_weight_path)
+            else:
+                weights = torch.load(self.weight_path)
             self.net.load_state_dict(weights)
         else:
             self.params = yload(params['result_dir'], 'params.yaml')
