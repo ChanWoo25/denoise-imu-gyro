@@ -269,14 +269,14 @@ class DGALossVer2(torch.nn.Module):
 
     def forward(self, a_hat, dv_16, dv_32, gt_dv_normed_dict):
         dv_16_loss, dv_32_loss = self.dv_loss(a_hat, dv_16, dv_32)
-        print('[Loss] dv_16(%1.6f), dv_32(%1.6f), '%(dv_16_loss.item(), dv_32_loss.item()), end='')
+        # print('[Loss] dv_16(%1.6f), dv_32(%1.6f), '%(dv_16_loss.item(), dv_32_loss.item()), end='')
         loss = dv_16_loss + dv_32_loss
 
         dv_noremd_losses = self.dv_normed_loss(a_hat, gt_dv_normed_dict)
         for key, val in dv_noremd_losses.items():
-            print('%s(%1.6f), ' % (key, val.item()), end='')
+            # print('%s(%1.6f), ' % (key, val.item()), end='')
             loss += val
-        print()
+        # print()
 
         return loss
 

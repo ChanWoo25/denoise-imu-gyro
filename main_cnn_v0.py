@@ -126,9 +126,9 @@ params = {
         },
 
         # frequency of validation step
-        'freq_val': 20,
+        'freq_val': 5,
         # total number of epochs
-        'n_epochs': 800,
+        'n_epochs': 200,
     }
 }
 

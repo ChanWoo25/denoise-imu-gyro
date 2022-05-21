@@ -40,8 +40,13 @@ class LearningProcess:
         self.dt = 0.005 # (s)
         self.id = params['id']
         self.predata_dir = params['dataset']['predata_dir']
+        self.figure_dir = os.path.join('/home/leecw/project/results/DenoiseIMU', 'figures')
 
         # self.preprocess()
+
+        ## For tilde logging
+        self.tilde_statistics_body:np.ndarray = None
+        self.tilde_statistics_world:np.ndarray = None
 
         if mode == 'train':
             if not os.path.exists(self.params['result_dir']):
@@ -50,7 +55,6 @@ class LearningProcess:
             self.net = params['net_class'](params)
         elif mode == 'test':
             self.params = yload(params['result_dir'], 'params.yaml')
-            self.figure_dir = os.path.join('/home/leecw/project/results/DenoiseIMU', 'figures')
             self.net = params['net_class'](params)
             if load_weight_path is not None:
                 weights = torch.load(load_weight_path)
@@ -59,11 +63,26 @@ class LearningProcess:
             self.net.load_state_dict(weights)
         else:
             self.params = yload(params['result_dir'], 'params.yaml')
-            self.figure_dir = os.path.join('/home/leecw/project/results/DenoiseIMU', 'figures')
             cprint('  No need to initialize a model', 'yellow')
             return
 
         self.net = self.net.cuda()
+
+    def log_tilde_distribution(self, np_epoch, tilde_mean, tilde_std, type):
+        if type == 'body':
+            sample = np.concatenate([np_epoch, tilde_mean, tilde_std]).reshape(7, 1)
+            if self.tilde_statistics_body is None:
+                self.tilde_statistics_body = sample
+            else:
+                self.tilde_statistics_body = np.concatenate([self.tilde_statistics_body, sample], axis=1)
+        elif type == 'world':
+            sample = np.concatenate([np_epoch, tilde_mean, tilde_std]).reshape(7, 1)
+            if self.tilde_statistics_world is None:
+                self.tilde_statistics_world = sample
+            else:
+                self.tilde_statistics_world = np.concatenate([self.tilde_statistics_world, sample], axis=1)
+
+
 
     def preprocess(self):
         print('\n# Preprocess ... ')
@@ -344,7 +363,7 @@ class LearningProcess:
 
             # Validate
             if epoch % freq_val == 0:
-                loss = self.loop_val(dataset_val, criterion)
+                loss = self.loop_val(dataset_val, criterion, epoch)
                 dt = time.time() - start_time
 
                 if loss <= best_loss:
@@ -363,8 +382,8 @@ class LearningProcess:
 
                 writer.add_scalar('loss/val', loss.item(), epoch)
                 start_time = time.time()
-            elif epoch % (freq_val//4) == 0:
-                print('Epoch %4d Loss(train) %.4f' % (epoch, loss_epoch))
+            # elif epoch % (freq_val//4) == 0:
+            #     print('Epoch %4d Loss(train) %.4f' % (epoch, loss_epoch))
 
 
         cprint('\n  Train is over  \n', 'cyan', attrs=['bold'])
@@ -502,19 +521,73 @@ class LearningProcess:
         optimizer.step()
         return loss_epoch
 
-    def loop_val(self, dataset, criterion):
+    def loop_val(self, dataset, criterion, epoch):
         """Forward loop over validation data"""
         loss_epoch = 0.0
 
         self.net.eval()
+
+        def plot_tilde_distribution(data:np.ndarray, seq, fname):
+            x, y, z = data[:, 0], data[:, 1], data[:, 2]
+            _mean = np.mean(data, axis=0)
+            _std  = np.std(data, axis=0)
+            fig, ax = plt.subplots(3, 1, figsize=(21, 12), dpi=200)
+            fig.suptitle('%s a_tilde_body Distribution / %s / %s' % (self.params['net_version'], seq, self.id), fontsize=20)
+
+            ax[0].hist(x, bins = 100, range=(x.min(), x.max()), label='x')
+            ax[0].set_ylabel("X axis frequency")
+            ax[0].legend()
+
+            ax[1].hist(y, bins = 100, range=(y.min(), y.max()), label='y')
+            ax[1].set_ylabel("Y axis frequency")
+            ax[1].legend()
+
+            ax[2].hist(z, bins = 100, range=(z.min(), z.max()), label='z')
+            ax[2].set_ylabel("Z axis frequency")
+            ax[2].legend()
+            _dir  = os.path.join(self.figure_dir, seq, 'tilde_dist')
+            _path = os.path.join(_dir, fname)
+            if not os.path.exists(_dir):
+                os.makedirs(_dir)
+            self.savefig(ax, fig, _path)
+            plt.close(fig)
+
+            return _mean, _std
+
         with torch.no_grad():
             for i in range(len(dataset)):
                 seq, us, q_gt, dv_16_gt, dv_32_gt, dv_normed_dict = dataset[i]
 
                 rot_gt = SO3.from_quaternion(q_gt.cuda())
                 rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
+                np_epoch = np.array([epoch])
 
-                a_hat = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0))
+                if self.params['net_version'] == 'ver1':
+                    a_hat, a_tilde_b = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0), mode='test')
+
+                    fname = "%d-Epoch-%s-Body.png" % (epoch, self.id)
+                    tilde_body_mu, tilde_body_std = plot_tilde_distribution(a_tilde_b.cpu().detach().numpy().squeeze(), seq, fname)
+                    self.log_tilde_distribution(np_epoch, tilde_body_mu, tilde_body_std, type='body')
+
+                elif self.params['net_version'] == 'ver2':
+                    a_hat, a_tilde_b, a_tilde_w = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0), mode='test')
+
+                    fname = "%d-Epoch-%s-Body.png" % (epoch, self.id)
+                    tilde_body_mu, tilde_body_std = plot_tilde_distribution(a_tilde_b.cpu().detach().numpy().squeeze(), seq, fname)
+                    self.log_tilde_distribution(np_epoch, tilde_body_mu, tilde_body_std, type='body')
+
+                    fname = "%d-Epoch-%s-World.png" % (epoch, self.id)
+                    tilde_world_mu, tilde_world_std = plot_tilde_distribution(a_tilde_w.cpu().detach().numpy().squeeze(), seq, fname)
+                    self.log_tilde_distribution(np_epoch, tilde_world_mu, tilde_world_std, type='world')
+                    # print('%d-Epoch/tilde_world_mu:' % epoch, tilde_world_mu.tolist())
+                    # print('%d-Epoch/tilde_world_std:' % epoch, tilde_world_std.tolist())
+
+                elif self.params['net_version'] == 'ver3':
+                    a_hat, a_tilde_w = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0), mode='test')
+
+                    fname = "%d-Epoch-%s-World.png" % (epoch, self.id)
+                    tilde_world_mu, tilde_world_std = plot_tilde_distribution(a_tilde_w.cpu().detach().numpy().squeeze(), seq, fname)
+                    self.log_tilde_distribution(np_epoch, tilde_world_mu, tilde_world_std, type='world')
 
                 for key in dv_normed_dict:
                     dv_normed_dict[key] = dv_normed_dict[key].unsqueeze(0)
@@ -522,6 +595,26 @@ class LearningProcess:
                 loss /= len(dataset)
 
                 loss_epoch += loss.cpu()
+
+
+        if self.params['net_version'] == 'ver1':
+            fname = os.path.join(self.params['result_dir'], 'tilde_dist_body.csv')
+            head = 'mu_x, mu_y, mu_z, std_x, std_y, std_z'
+            np.savetxt(fname, self.tilde_statistics_body, delimiter=',', header=head)
+
+        elif self.params['net_version'] == 'ver2':
+            fname = os.path.join(self.params['result_dir'], 'tilde_dist_body.csv')
+            head = 'mu_x, mu_y, mu_z, std_x, std_y, std_z'
+            np.savetxt(fname, self.tilde_statistics_body, delimiter=',', header=head)
+
+            fname = os.path.join(self.params['result_dir'], 'tilde_dist_world.csv')
+            head = 'mu_x, mu_y, mu_z, std_x, std_y, std_z'
+            np.savetxt(fname, self.tilde_statistics_world, delimiter=',', header=head)
+
+        elif self.params['net_version'] == 'ver3':
+            fname = os.path.join(self.params['result_dir'], 'tilde_dist_world.csv')
+            head = 'mu_x, mu_y, mu_z, std_x, std_y, std_z'
+            np.savetxt(fname, self.tilde_statistics_world, delimiter=',', header=head)
 
         self.net.train()
         return loss_epoch
@@ -540,34 +633,6 @@ class LearningProcess:
                 a_hat, a_tilde_b = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0), mode='test')
 
                 ### Plot hist body
-                def plot_tilde_distribution(data:np.ndarray, seq, fname):
-                    x, y, z = data[:, 0], data[:, 1], data[:, 2]
-                    _mean = np.mean(data, axis=0)
-                    _std  = np.std(data, axis=0)
-                    fig, ax = plt.subplots(3, 1, figsize=(21, 12), dpi=200)
-                    fig.suptitle('%s a_tilde_body Distribution / %s / %s' % (self.params['net_version'], seq, self.id), fontsize=20)
-
-                    ax[0].hist(x, bins = 100, range=(x.min(), x.max()), label='x')
-                    ax[0].set_ylabel("X axis frequency")
-                    ax[0].legend()
-
-                    ax[1].hist(y, bins = 100, range=(y.min(), y.max()), label='y')
-                    ax[1].set_ylabel("Y axis frequency")
-                    ax[1].legend()
-
-                    ax[2].hist(z, bins = 100, range=(z.min(), z.max()), label='z')
-                    ax[2].set_ylabel("Z axis frequency")
-                    ax[2].legend()
-                    _dir  = os.path.join(self.figure_dir, seq, 'tilde_dist')
-                    _path = os.path.join(_dir, fname)
-                    if not os.path.exists(_dir):
-                        os.makedirs(_dir)
-                    self.savefig(ax, fig, _path)
-                    plt.close(fig)
-
-                    return _mean, _std
-
-
                 x = a_tilde_b.cpu().detach().numpy().squeeze()
                 fig, ax = plt.subplots(3, 1, figsize=self.figsize, dpi=200)
                 fig.suptitle('%s a_tilde_body Distribution / %s / %s' % (self.params['net_version'], seq, self.id), fontsize=20)

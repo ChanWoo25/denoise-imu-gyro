@@ -277,7 +277,7 @@ class DGANetVer3(torch.nn.Module):
         net_params = params['net']
 
         self.in_dim  = net_params['in_dim']
-        self.out_dim = 6
+        self.out_dim = 3
         self.dropout = net_params['dropout']
         self.momentum= net_params['momentum']
         self.gyro_std = net_params['gyro_std']
