@@ -17,7 +17,6 @@ class DGANet(torch.nn.Module):
         print('\n# Initilaize DGANet ...')
 
         net_params = params['net']
-
         self.in_dim  = net_params['in_dim']
         self.out_dim = 3 # net_params['out_dim']
         self.dropout = net_params['dropout']

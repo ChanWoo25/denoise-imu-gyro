@@ -1,13 +1,15 @@
 import os
 import numpy as np
 import torch
+from termcolor import cprint
 
 from src.DGAProcess import LearningProcess
 
 from src.DGALoss import DGALoss, DGALossVer2
 from src.DGANet import DGANet, DGANetVer2, DGANetVer3
+from src.DGNet import DGNetVer1
+from src.DGLoss import DGLossVer1, DGLossVer2
 
-from termcolor import cprint
 
 
 import argparse
@@ -20,7 +22,7 @@ parser.add_argument('--machine', type=str, default='server')
 parser.add_argument('--c0', type=int, default=16)
 parser.add_argument('--lr', type=float, default=0.01)
 parser.add_argument('--dv', nargs='+', type=int, default=[16, 32])
-parser.add_argument('--dv_normed', nargs='+', type=int, default=[32, 64])
+parser.add_argument('--dv_normed', nargs='+', type=int, default=[16, 32])
 args = parser.parse_args()
 print(args.__dict__)
 
@@ -33,15 +35,21 @@ elif args.machine == 'docker':
     results_dir = os.path.join('/root', 'project', 'results', 'DenoiseIMU')
 
 
-if args.net_version == 'ver1':
-    Net = DGANet
-    Loss = DGALossVer2
-elif args.net_version == 'ver2':
-    Net = DGANetVer2
-    Loss = DGALossVer2
-elif args.net_version == 'ver3':
-    Net = DGANetVer3
-    Loss = DGALossVer2
+if args.net_version == 'acc_ver1':
+    Net =   DGANet
+    Loss =  DGALossVer2
+elif args.net_version == 'acc_ver2':
+    Net =   DGANetVer2
+    Loss =  DGALossVer2
+elif args.net_version == 'acc_ver3':
+    Net =   DGANetVer3
+    Loss =  DGALossVer2
+elif args.net_version == 'ori_ver1':
+    Net =   DGNetVer1
+    Loss =  DGLossVer1
+elif args.net_version == 'ori_ver2':
+    Net =   DGNetVer1
+    Loss =  DGLossVer2
 
 params = {
     'net_version': args.net_version,

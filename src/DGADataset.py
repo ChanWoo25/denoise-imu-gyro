@@ -76,9 +76,9 @@ class DGADataset(Dataset):
         q_gt = np.loadtxt(fname, delimiter=',')
         q_gt = torch.from_numpy(q_gt).cuda().float()
 
-        # fname = os.path.join(self.predata_dir, seq, 'w_gt.csv')
-        # w_gt = np.loadtxt(fname, delimiter=',')
-        # w_gt = torch.from_numpy(w_gt).cuda()
+        fname = os.path.join(self.predata_dir, seq, 'w_gt.csv')
+        w_gt = np.loadtxt(fname, delimiter=',')
+        w_gt = torch.from_numpy(w_gt).cuda()
 
         fname = os.path.join(self.predata_dir, seq, 'dv_16_gt.csv')
         dv_16_gt = np.loadtxt(fname, delimiter=',')
@@ -88,6 +88,14 @@ class DGADataset(Dataset):
         dv_32_gt = np.loadtxt(fname, delimiter=',')
         dv_32_gt = torch.from_numpy(dv_32_gt).cuda().float()
 
+        fname = os.path.join(self.predata_dir, seq, 'dw_16_gt.csv')
+        dw_16_gt = np.loadtxt(fname, delimiter=',')
+        dw_16_gt = torch.from_numpy(dw_16_gt).cuda().float()
+
+        fname = os.path.join(self.predata_dir, seq, 'dw_32_gt.csv')
+        dw_32_gt = np.loadtxt(fname, delimiter=',')
+        dw_32_gt = torch.from_numpy(dw_32_gt).cuda().float()
+
         dv_normed_windows = [16, 32, 64, 128, 256, 512] #
         dv_normed_dict = {}
         for window in dv_normed_windows:
@@ -96,24 +104,41 @@ class DGADataset(Dataset):
             val = torch.from_numpy(val).cuda().float()
             dv_normed_dict[str(window)] = val
 
+        fname = os.path.join(self.predata_dir, seq, 'w_mean.csv')
+        w_mean = np.loadtxt(fname, delimiter=',')
+        w_mean = torch.from_numpy(w_mean).cuda().float()
+
+        fname = os.path.join(self.predata_dir, seq, 'w_std.csv')
+        w_std = np.loadtxt(fname, delimiter=',')
+        w_std = torch.from_numpy(w_std).cuda().float()
+
+        fname = os.path.join(self.predata_dir, seq, 'a_mean.csv')
+        a_mean = np.loadtxt(fname, delimiter=',')
+        a_mean = torch.from_numpy(a_mean).cuda().float()
+
+        fname = os.path.join(self.predata_dir, seq, 'a_std.csv')
+        a_std = np.loadtxt(fname, delimiter=',')
+        a_std = torch.from_numpy(a_std).cuda().float()
 
         ## GET Range
         N_max = dv_32_gt.shape[0]
-        if self.mode == 'train': # random start
+        # random start
+        if self.mode == 'train':
             _max = N_max - self.N
             n0 = torch.randint(0, _max, (1, ))
             nend = n0 + self.N
-            # print('n0: %d, nend: %d' % (n0, nend))
-        else:  # full sequence
+        # full sequence
+        else:
             n0 = 0
             nend = N_max - (N_max % self.max_train_freq)
-
-        # print('%s mode -- crop [%d, %d)' % (self.mode, n0, nend))
 
         ## CROP
         ts       = ts[n0: nend]
         us       = us[n0: nend]
         q_gt     = q_gt[n0:nend]
+        w_gt     = w_gt[n0:nend]
+        dw_16_gt = dw_16_gt[n0:nend]
+        dw_32_gt = dw_32_gt[n0:nend]
         dv_16_gt = dv_16_gt[n0: nend-16]
         dv_32_gt = dv_32_gt[n0: nend-32]
         for key, value in dv_normed_dict.items():
@@ -122,7 +147,10 @@ class DGADataset(Dataset):
         if self.mode == 'train':
             assert us.shape[0] == self.N
 
-        return seq, us, q_gt, dv_16_gt, dv_32_gt, dv_normed_dict
+        return \
+            seq, us, q_gt, w_gt, \
+            dw_16_gt, dw_32_gt, dv_16_gt, dv_32_gt, dv_normed_dict, \
+            w_mean, w_std, a_mean, a_std
 
     def __len__(self):
         return len(self.seq_dict[self.mode])
