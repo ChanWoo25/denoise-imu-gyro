@@ -87,7 +87,7 @@ class Data:
 
         self.g = torch.tensor([0, 0, 9.81], device=self.device, requires_grad=False)
 
-    def get_gap_distribution(self, start=None, end=None):
+    def get_gap_distribution(self, start=None, end=None, plot=False):
         print('[%s] Gap Distribution' % self.seq)
         q_gt = torch.tensor(self.gt_int[:, 4:8], device=self.device)
         q_gt = q_gt / q_gt.norm(dim=1, keepdim=True)
@@ -149,62 +149,99 @@ class Data:
         print('%12s'%'w_gap_std:', w_gap_std, w_gap_std.shape)
         print('%12s'%'w_gap_mean:', w_gap_mean, w_gap_mean.shape)
 
-        ### Visualize Accel Gap
-        fig, ax = plt.subplots(3, 1)
-        fig.suptitle('%s / Accel Gap histogram' % self.seq)
+        ## Compute Gaussian Negative Log Likelihood (NLL) Loss
+        def gaussian_nll_loss(gap, mu, sigma, eps=1e-6):
+            var = sigma**2
+            var[var<eps] = eps
+            _first = np.log(var)
+            _second = (gap-mu)**2 / var
+            _loss = (_first + _second) / 2.0
+            _loss = np.mean(_loss, axis=0)
+            return _loss
+        a_gap_nll_loss = gaussian_nll_loss(a_gap, a_gap_mean, a_gap_std)
+        w_gap_nll_loss = gaussian_nll_loss(w_gap, w_gap_mean, w_gap_std)
 
-        N = a_gap.shape[0]
-        n_bins = 500
+        ##
+        equal_to_torch_gaussian_nll_loss = False
+        if equal_to_torch_gaussian_nll_loss:
+            Loss = torch.nn.GaussianNLLLoss()
+            t_a_gap = torch.from_numpy(a_gap)
+            output = Loss(
+                t_a_gap,
+                torch.from_numpy(a_gap_mean).expand_as(t_a_gap),
+                torch.from_numpy(a_gap_std**2).expand_as(t_a_gap)).numpy()
+            assert np.abs(output.item() - a_gap_nll_loss.sum().item()) < 1e-8
 
-        def gaussian(x, mu, sig):
-            return (1. / (sig * np.sqrt(2 * np.pi))) * np.exp(- (x - mu)**2 / (2 * sig**2))
+        if plot:
+            ### Visualize Accel Gap
+            fig, ax = plt.subplots(3, 1)
+            fig.suptitle('%s / Accel Gap histogram' % self.seq)
 
-        count, bins, _ = ax[0].hist(a_gap[:, 0], bins=n_bins, density=True, histtype='step', color='k', label='a_gap x')
-        ax[0].plot(bins, gaussian(bins, a_gap_mean[0], a_gap_std[0]), color='r', label='gaussian_x')
-        ax[0].set_ylabel("P(a_gap_x)")
-        ax[0].legend()
+            N = a_gap.shape[0]
+            n_bins = 500
 
-        count, bins, _ = ax[1].hist(a_gap[:, 1], bins=n_bins, density=True, histtype='step', color='k', label='a_gap y')
-        ax[1].plot(bins, gaussian(bins, a_gap_mean[1], a_gap_std[1]), color='r', label='gaussian_y')
-        ax[1].set_ylabel("P(a_gap_y)")
-        ax[1].legend()
+            def gaussian(x, mu, sig):
+                return (1. / (sig * np.sqrt(2 * np.pi))) * np.exp(- (x - mu)**2 / (2 * sig**2))
 
-        count, bins, _ = ax[2].hist(a_gap[:, 2], bins=n_bins, density=True, histtype='step', color='k', label='a_gap z')
-        ax[2].plot(bins, gaussian(bins, a_gap_mean[2], a_gap_std[2]), color='r', label='gaussian_z')
-        ax[2].set_ylabel("P(a_gap_z)")
-        ax[2].legend()
+            count, bins, _ = ax[0].hist(a_gap[:, 0], bins=n_bins, density=True, histtype='step', color='k', label='a_gap x')
+            ax[0].plot(bins, gaussian(bins, a_gap_mean[0], a_gap_std[0]), color='r', label='gaussian_x')
+            ax[0].set_ylabel("P(a_gap_x)")
+            ax[0].set_xlabel("NLL Loss: %1.4f" % a_gap_nll_loss[0].item())
+            ax[0].legend()
 
-        pth = os.path.join(self.path_dir_result, 'accel_gap_distribution.png')
-        plt.tight_layout()
-        fig.savefig(pth)
-        plt.close(fig)
+            count, bins, _ = ax[1].hist(a_gap[:, 1], bins=n_bins, density=True, histtype='step', color='k', label='a_gap y')
+            ax[1].plot(bins, gaussian(bins, a_gap_mean[1], a_gap_std[1]), color='r', label='gaussian_y')
+            ax[1].set_ylabel("P(a_gap_y)")
+            ax[1].set_xlabel("NLL Loss: %1.4f" % a_gap_nll_loss[1].item())
+            ax[1].legend()
 
-        ### Visualize Angular Velocity Gap
-        fig, ax = plt.subplots(3, 1)
-        fig.suptitle('%s / Angular Gap histogram' % self.seq)
+            count, bins, _ = ax[2].hist(a_gap[:, 2], bins=n_bins, density=True, histtype='step', color='k', label='a_gap z')
+            ax[2].plot(bins, gaussian(bins, a_gap_mean[2], a_gap_std[2]), color='r', label='gaussian_z')
+            ax[2].set_ylabel("P(a_gap_z)")
+            ax[2].set_xlabel("NLL Loss: %1.4f" % a_gap_nll_loss[2].item())
+            ax[2].legend()
 
-        N = w_gap.shape[0]
-        n_bins = 500
+            pth = os.path.join(self.path_dir_result, 'accel_gap_distribution.png')
+            plt.tight_layout()
+            fig.savefig(pth)
+            plt.close(fig)
 
-        count, bins, _ = ax[0].hist(w_gap[:, 0], bins=n_bins, density=True, histtype='step', color='k', label='w_gap x')
-        ax[0].plot(bins, gaussian(bins, w_gap_mean[0], w_gap_std[0]), color='r', label='gaussian_x')
-        ax[0].set_ylabel("P(w_gap_x)")
-        ax[0].legend()
+            ### Visualize Angular Velocity Gap
+            fig, ax = plt.subplots(3, 1)
+            fig.suptitle('%s / Angular Gap histogram' % self.seq)
 
-        count, bins, _ = ax[1].hist(w_gap[:, 1], bins=n_bins, density=True, histtype='step', color='k', label='w_gap y')
-        ax[1].plot(bins, gaussian(bins, w_gap_mean[1], w_gap_std[1]), color='r', label='gaussian_y')
-        ax[1].set_ylabel("P(w_gap_y)")
-        ax[1].legend()
+            N = w_gap.shape[0]
+            n_bins = 500
 
-        count, bins, _ = ax[2].hist(w_gap[:, 2], bins=n_bins, density=True, histtype='step', color='k', label='w_gap z')
-        ax[2].plot(bins, gaussian(bins, w_gap_mean[2], w_gap_std[2]), color='r', label='gaussian_z')
-        ax[2].set_ylabel("P(w_gap_z)")
-        ax[2].legend()
+            count, bins, _ = ax[0].hist(w_gap[:, 0], bins=n_bins, density=True, histtype='step', color='k', label='w_gap x')
+            ax[0].plot(bins, gaussian(bins, w_gap_mean[0], w_gap_std[0]), color='r', label='gaussian_x')
+            ax[0].set_ylabel("P(w_gap_x)")
+            ax[0].set_xlabel("NLL Loss: %1.4f" % w_gap_nll_loss[0].item())
+            ax[0].legend()
 
-        pth = os.path.join(self.path_dir_result, 'angular_gap_distribution.png')
-        plt.tight_layout()
-        fig.savefig(pth)
-        plt.close(fig)
+            count, bins, _ = ax[1].hist(w_gap[:, 1], bins=n_bins, density=True, histtype='step', color='k', label='w_gap y')
+            ax[1].plot(bins, gaussian(bins, w_gap_mean[1], w_gap_std[1]), color='r', label='gaussian_y')
+            ax[1].set_ylabel("P(w_gap_y)")
+            ax[1].set_xlabel("NLL Loss: %1.4f" % w_gap_nll_loss[1].item())
+            ax[1].legend()
+
+            count, bins, _ = ax[2].hist(w_gap[:, 2], bins=n_bins, density=True, histtype='step', color='k', label='w_gap z')
+            ax[2].plot(bins, gaussian(bins, w_gap_mean[2], w_gap_std[2]), color='r', label='gaussian_z')
+            ax[2].set_ylabel("P(w_gap_z)")
+            ax[2].set_xlabel("NLL Loss: %1.4f" % w_gap_nll_loss[2].item())
+            ax[2].legend()
+
+            pth = os.path.join(self.path_dir_result, 'angular_gap_distribution.png')
+            plt.tight_layout()
+            fig.savefig(pth)
+            plt.close(fig)
+
+        return {
+            'a_mean': torch.from_numpy(a_gap_mean),
+            'a_std':  torch.from_numpy(a_gap_std),
+            'w_mean': torch.from_numpy(w_gap_mean),
+            'w_std':  torch.from_numpy(w_gap_std),
+        }
 
 
     def plot_accel(self, start=None, end=None, avg_window=1):
@@ -525,13 +562,15 @@ if (False):
 
 def main():
 
+    dist_dict = {}
     for seq in euroc_seqs:
         dataset = Data(seq)
         # dataset.plot_accel(avg_window=1)
         # dataset.plot_accel_gap(avg_window=51)
-        dataset.get_gap_distribution()
-
+        _dict = dataset.get_gap_distribution(plot=True)
+        dist_dict[seq] = _dict
+    fname = os.path.join('/home/leecw/project/results/Figures', 'gap_dist.pt')
+    torch.save(dist_dict, fname)
 
 if __name__ == '__main__':
     main()
-
