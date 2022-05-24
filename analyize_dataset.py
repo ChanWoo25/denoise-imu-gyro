@@ -10,9 +10,6 @@ import os
 from src.lie_algebra import SO3
 from src.utils import bmtm, bmtv, bmmt, bbmv
 
-tmp = {
-
-}
 euroc_seqs = [
     'MH_01_easy',
     'MH_02_easy',
@@ -87,6 +84,128 @@ class Data:
 
         self.gt_int = interpolate(self.gt, self.gt[:, 0]/1e9, self.imu[:, 0]/1e9)
         self.gt_int[:, 0] = self.imu[:, 0]
+
+        self.g = torch.tensor([0, 0, 9.81], device=self.device, requires_grad=False)
+
+    def get_gap_distribution(self, start=None, end=None):
+        print('[%s] Gap Distribution' % self.seq)
+        q_gt = torch.tensor(self.gt_int[:, 4:8], device=self.device)
+        q_gt = q_gt / q_gt.norm(dim=1, keepdim=True)
+        rot_gt = SO3.from_quaternion(q_gt, ordering='wxyz')
+        N = rot_gt.shape[0]
+
+        rot_tmp = bmtm(rot_gt[:-1], rot_gt[1:])
+        rot_tmp = SO3.dnormalize(rot_tmp.double())
+        q_tmp = SO3.to_quaternion(rot_tmp)
+        q_tmp = SO3.qnorm(q_tmp).cpu()
+        _t = torch.from_numpy(np.linspace(1.0, float(N-1), N-1)).cpu().double()
+        _t_int = _t[:-1] + 0.5
+        q_int_tmp = SO3.qinterp(q_tmp.cpu(), _t, _t_int)
+        q_int_tmp = SO3.qnorm(q_int_tmp)
+        q_tmp = torch.cat([q_tmp[0].unsqueeze(0), q_int_tmp, q_tmp[-1].unsqueeze(0)])
+        rot_tmp = SO3.from_quaternion(q_tmp.cuda(), ordering='wxyz')
+        w_gt = SO3.log(rot_tmp) / 0.005
+        assert w_gt.shape[0] == q_gt.shape[0]
+
+        v_gt = torch.tensor(self.gt_int[:, 8:11], device=self.device)
+        a_gt = (v_gt[1:] - v_gt[:-1]) / 0.005
+        a_gt = torch.cat([a_gt[0].unsqueeze(0), (a_gt[1:] + a_gt[:-1]) / 2.0, a_gt[-1].unsqueeze(0)])
+
+        ts = torch.tensor(self.gt_int[:, 0], device=self.device)
+
+        a_raw = torch.tensor(self.imu[:, 4:7], device=self.device)
+        a_raw = torch.einsum('bij, bj -> bi', rot_gt, a_raw) - self.g
+        w_raw = torch.tensor(self.imu[:, 1:4], device=self.device)
+
+        ## When you want to see analysis values by specific section
+        if start is not None and end is not None:
+            i0 = np.searchsorted(ts, start)
+            iN = np.searchsorted(ts, end, side='right')
+            print('Clip %d to %d' % (i0, iN))
+
+            a_raw = a_raw[i0:iN]
+            w_raw = w_raw[i0:iN]
+            v_gt = v_gt[i0:iN]
+            a_gt = a_gt[i0:iN]
+            w_gt = w_gt[i0:iN]
+            q_gt = q_gt[i0:iN]
+            ts = ts[i0:iN]
+
+        ## Compute a_gap
+        a_gap = a_gt - a_raw
+        a_gap_std, a_gap_mean = torch.std_mean(a_gap, dim=0)
+        a_gap = a_gap.cpu().numpy()
+        a_gap_std = a_gap_std.cpu().numpy()
+        a_gap_mean = a_gap_mean.cpu().numpy()
+        print('%12s'%'a_gap_std:', a_gap_std, a_gap_std.shape)
+        print('%12s'%'a_gap_mean:', a_gap_mean, a_gap_mean.shape)
+
+        ## Compute w_gap
+        w_gap = w_gt - w_raw
+        w_gap_std, w_gap_mean = torch.std_mean(w_gap, dim=0)
+        w_gap = w_gap.cpu().numpy()
+        w_gap_std = w_gap_std.cpu().numpy()
+        w_gap_mean = w_gap_mean.cpu().numpy()
+        print('%12s'%'w_gap_std:', w_gap_std, w_gap_std.shape)
+        print('%12s'%'w_gap_mean:', w_gap_mean, w_gap_mean.shape)
+
+        ### Visualize Accel Gap
+        fig, ax = plt.subplots(3, 1)
+        fig.suptitle('%s / Accel Gap histogram' % self.seq)
+
+        N = a_gap.shape[0]
+        n_bins = 500
+
+        def gaussian(x, mu, sig):
+            return (1. / (sig * np.sqrt(2 * np.pi))) * np.exp(- (x - mu)**2 / (2 * sig**2))
+
+        count, bins, _ = ax[0].hist(a_gap[:, 0], bins=n_bins, density=True, histtype='step', color='k', label='a_gap x')
+        ax[0].plot(bins, gaussian(bins, a_gap_mean[0], a_gap_std[0]), color='r', label='gaussian_x')
+        ax[0].set_ylabel("P(a_gap_x)")
+        ax[0].legend()
+
+        count, bins, _ = ax[1].hist(a_gap[:, 1], bins=n_bins, density=True, histtype='step', color='k', label='a_gap y')
+        ax[1].plot(bins, gaussian(bins, a_gap_mean[1], a_gap_std[1]), color='r', label='gaussian_y')
+        ax[1].set_ylabel("P(a_gap_y)")
+        ax[1].legend()
+
+        count, bins, _ = ax[2].hist(a_gap[:, 2], bins=n_bins, density=True, histtype='step', color='k', label='a_gap z')
+        ax[2].plot(bins, gaussian(bins, a_gap_mean[2], a_gap_std[2]), color='r', label='gaussian_z')
+        ax[2].set_ylabel("P(a_gap_z)")
+        ax[2].legend()
+
+        pth = os.path.join(self.path_dir_result, 'accel_gap_distribution.png')
+        plt.tight_layout()
+        fig.savefig(pth)
+        plt.close(fig)
+
+        ### Visualize Angular Velocity Gap
+        fig, ax = plt.subplots(3, 1)
+        fig.suptitle('%s / Angular Gap histogram' % self.seq)
+
+        N = w_gap.shape[0]
+        n_bins = 500
+
+        count, bins, _ = ax[0].hist(w_gap[:, 0], bins=n_bins, density=True, histtype='step', color='k', label='w_gap x')
+        ax[0].plot(bins, gaussian(bins, w_gap_mean[0], w_gap_std[0]), color='r', label='gaussian_x')
+        ax[0].set_ylabel("P(w_gap_x)")
+        ax[0].legend()
+
+        count, bins, _ = ax[1].hist(w_gap[:, 1], bins=n_bins, density=True, histtype='step', color='k', label='w_gap y')
+        ax[1].plot(bins, gaussian(bins, w_gap_mean[1], w_gap_std[1]), color='r', label='gaussian_y')
+        ax[1].set_ylabel("P(w_gap_y)")
+        ax[1].legend()
+
+        count, bins, _ = ax[2].hist(w_gap[:, 2], bins=n_bins, density=True, histtype='step', color='k', label='w_gap z')
+        ax[2].plot(bins, gaussian(bins, w_gap_mean[2], w_gap_std[2]), color='r', label='gaussian_z')
+        ax[2].set_ylabel("P(w_gap_z)")
+        ax[2].legend()
+
+        pth = os.path.join(self.path_dir_result, 'angular_gap_distribution.png')
+        plt.tight_layout()
+        fig.savefig(pth)
+        plt.close(fig)
+
 
     def plot_accel(self, start=None, end=None, avg_window=1):
 
@@ -204,16 +323,17 @@ class Data:
 
     def plot_accel_gap(self, start=None, end=None, avg_window=1):
 
-        v_gt = torch.tensor(self.gt_int[:, 8:11], device=self.device)
-        a_gt = (v_gt[1:] - v_gt[:-1]) / 0.005
-        a_gt = torch.cat([a_gt[0].unsqueeze(0), (a_gt[1:] + a_gt[:-1]) / 2.0, a_gt[-1].unsqueeze(0)])
-        ts = torch.tensor(self.gt_int[:, 0], device=self.device)
-
-
-        a_raw = torch.tensor(self.imu[:, 4:7], device=self.device)
         q_gt = torch.tensor(self.gt_int[:, 4:8], device=self.device)
         q_gt = q_gt / q_gt.norm(dim=1, keepdim=True)
         rot_gt = SO3.from_quaternion(q_gt, ordering='wxyz')
+
+        v_gt = torch.tensor(self.gt_int[:, 8:11], device=self.device)
+        a_gt = (v_gt[1:] - v_gt[:-1]) / 0.005
+        a_gt = torch.cat([a_gt[0].unsqueeze(0), (a_gt[1:] + a_gt[:-1]) / 2.0, a_gt[-1].unsqueeze(0)])
+
+        ts = torch.tensor(self.gt_int[:, 0], device=self.device)
+
+        a_raw = torch.tensor(self.imu[:, 4:7], device=self.device)
         a_raw = torch.einsum('bij, bj -> bi', rot_gt, a_raw)
 
         if start is not None and end is not None:
@@ -369,12 +489,14 @@ class Data:
         img = np.array(img)
 
         fig, axs = plt.subplots()
+
 # MH_01_easy 데이터셋에서 드론이 멈춰있는 시간과, 그 시간 안에서 살짝 진동하는 시간을 제외하고,
 # World frame에서의 a^{IMU} 값이 어떻게 진동하고, 얼마나 Bias가 생기는지 알아본다.
 # 1403636601713555456 : stop start
 # 1403636611163555584 : vibe start
 # 1403636613613555456 : vibe end
 # 1403636623613555456 : stop end
+
 euroc_seqs = [
     'MH_01_easy',
     'MH_02_easy',
@@ -401,30 +523,15 @@ if (False):
     # mh_01_easy = Data('MH_03_medium')
     # mh_01_easy.plot_accel()
 
-for seq in euroc_seqs:
-    dataset = Data(seq)
-    # dataset.plot_accel(avg_window=1)
-    dataset.plot_accel_gap(avg_window=51)
+def main():
 
-r_x = 0.0
-r_y = 0.0
-r_z = 0.0
-g_x = 0.0
-g_y = 0.0
-g_z = 0.0
+    for seq in euroc_seqs:
+        dataset = Data(seq)
+        # dataset.plot_accel(avg_window=1)
+        # dataset.plot_accel_gap(avg_window=51)
+        dataset.get_gap_distribution()
 
-for seq in euroc_seqs:
-    r_x += tmp[seq][1]
-    g_x += tmp[seq][2]
-    r_y += tmp[seq][3]
-    g_y += tmp[seq][4]
-    r_z += tmp[seq][5]
-    g_z += tmp[seq][6]
 
-r_x /= len(euroc_seqs); print(r_x)
-g_x /= len(euroc_seqs); print(g_x)
-r_y /= len(euroc_seqs); print(r_y)
-g_y /= len(euroc_seqs); print(g_y)
-r_z /= len(euroc_seqs); print(r_z)
-g_z /= len(euroc_seqs); print(g_z)
+if __name__ == '__main__':
+    main()
 
