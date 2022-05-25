@@ -56,12 +56,9 @@ class DGLossVer1(torch.nn.Module):
 
         return gyro_loss_16, gyro_loss_32
 
-    def forward(self, w_hat, dw_16, show=False):
+    def forward(self, w_hat, dw_16):
         gyro16, gyro32 = self.gyro_loss(w_hat, dw_16)
-        if show:
-            print('Gyro 16 Loss:', gyro16.item())
-            print('Gyro 32 Loss:', gyro32.item())
-        return gyro16 + gyro32
+        return gyro16, gyro32
 
 
 
@@ -118,21 +115,25 @@ class DGLossVer2(torch.nn.Module):
 
         return gyro_loss_16, gyro_loss_32
 
-    def gaussian_nll_loss(self, w_hat, w_gt, w_mean, w_std):
+    def gaussian_nll_loss(self, w_hat, w_gt, w_mean:torch.Tensor, w_std):
         eps = 1e-6
         w_var = w_std ** 2
         w_var[w_var<eps] = eps
         w_gap = w_gt - w_hat
+
+        w_mean = w_mean.unsqueeze(1).expand_as(w_gap)
+        w_var = w_var.unsqueeze(1).expand_as(w_gap)
+        # print('_first:', _first.shape)
+        # print('w_gap:', w_gap.shape)
+        # print('w_mean:', w_mean.shape)
+        # print('w_var:', w_var.shape)
+
         _first = torch.log(w_var)
         _second = (w_gap - w_mean)**2 / w_var
         _loss = (_first + _second) / 2.0
         return torch.mean(_loss)
 
-    def forward(self, w_hat, dw_16, w_gt, w_mean, w_std, show=False):
+    def forward(self, w_hat, dw_16, w_gt, w_mean, w_std):
         gyro16, gyro32 = self.gyro_loss(w_hat, dw_16)
         gnll = self.gaussian_nll_loss(w_hat, w_gt, w_mean, w_std)
-        if show:
-            print('Gyro 16 Loss:', gyro16.item())
-            print('Gyro 32 Loss:', gyro32.item())
-            print('Gaussian Loss:', gnll.item())
-        return gyro16 + gyro32 + gnll
+        return gyro16, gyro32, gnll

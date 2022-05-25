@@ -21,6 +21,7 @@ parser.add_argument('--load_weight_path', type=str, default=None)
 parser.add_argument('--machine', type=str, default='server')
 parser.add_argument('--c0', type=int, default=16)
 parser.add_argument('--lr', type=float, default=0.01)
+parser.add_argument('--ori_gnll_ratio', type=float, default=1.0)
 parser.add_argument('--dv', nargs='+', type=int, default=[16, 32])
 parser.add_argument('--dv_normed', nargs='+', type=int, default=[16, 32])
 args = parser.parse_args()
@@ -119,6 +120,7 @@ params = {
             'dt': 0.005,
             'dv': args.dv,
             'dv_normed': args.dv_normed,
+            'ori_gnll_ratio': args.ori_gnll_ratio,
         },
         'scheduler_class': torch.optim.lr_scheduler.CosineAnnealingWarmRestarts,
         'scheduler': {
@@ -136,7 +138,7 @@ params = {
         # frequency of validation step
         'freq_val': 20,
         # total number of epochs
-        'n_epochs': 800,
+        'n_epochs': 1200,
     }
 }
 

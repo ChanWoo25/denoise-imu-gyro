@@ -1,9 +1,14 @@
 #! /bin/bash
 
-# [220524 20:24] Gaussian NLL Loss 적용 Test
-CUDA_VISIBLE_DEVICES=5 python3 main_cnn_v0.py --mode train \
+# [220525 14:00] Gaussian NLL Loss 적용 Test
+CUDA_VISIBLE_DEVICES=5 python3 main_cnn_v0.py --mode test \
     --c0 16 --dv_normed 16 32 --net_version='ori_ver1' \
     --id 220524-gyro-c16-dvn_16_32-00
+
+# # [220524 20:24] Gaussian NLL Loss 적용 Test
+# CUDA_VISIBLE_DEVICES=5 python3 main_cnn_v0.py --mode train \
+#     --c0 16 --dv_normed 16 32 --net_version='ori_ver1' \
+#     --id 220524-gyro-c16-dvn_16_32-00
 
 # # [220511 03:32 - Noise Loss 굉장히 안 좋은 생각 같다... 윈도우 사이즈라도 줄여보자]
 # CUDA_VISIBLE_DEVICES=7 python3 main_cnn_v0.py --mode train \

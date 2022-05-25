@@ -41,7 +41,7 @@ class LearningProcess:
         self.id = params['id']
         self.predata_dir = params['dataset']['predata_dir']
 
-        self.preprocess()
+        # self.preprocess()
 
         if mode == 'train':
             if not os.path.exists(self.params['result_dir']):
@@ -439,7 +439,7 @@ class LearningProcess:
                 os.mkdir(os.path.join(self.params['result_dir'], seq))
 
             ## LOAD DATA
-            seq, us, q_gt, dv_16_gt, dv_32_gt, dv_normed_dict = dataset_test[i]
+            seq, us, q_gt, w_gt, dw_16_gt, dw_32_gt, dv_16_gt, dv_32_gt, dv_normed_dict, w_mean, w_std, a_mean, a_std = dataset_test[i]
 
             us = us.cpu()
             q_gt = q_gt.cpu()
@@ -469,27 +469,28 @@ class LearningProcess:
             def rad2deg(x):
                 return x * (180. / np.pi)
 
-            # quat_hat, rot_imu, rot_hat = self.integrate_with_quaternions_superfast(dw_16.shape[0], us, w_hat, quat_gt)
-            # rpy_imu = SO3.to_rpy(rot_imu).cpu()
-            # rpy_hat = SO3.to_rpy(rot_hat).cpu()
-            # self.plot_orientation(N, rad2deg(rpy_imu), rad2deg(rpy_hat), rad2deg(rpy_gt))
-            # self.plot_orientation_error(N, rot_imu, rot_hat, rot_gt)
+            ## Analyze Orientation
+            quat_hat, rot_imu, rot_hat = self.integrate_with_quaternions_superfast(dw_16.shape[0], us, w_hat, quat_gt)
+            rpy_imu = SO3.to_rpy(rot_imu).cpu()
+            rpy_hat = SO3.to_rpy(rot_hat).cpu()
+            self.plot_orientation(N, rad2deg(rpy_imu), rad2deg(rpy_hat), rad2deg(rpy_gt))
+            self.plot_orientation_error(N, rot_imu, rot_hat, rot_gt)
 
-            # gyro_corrections  =  (us[:, :3]  - w_hat[:N, :])
-            # self.plot_gyro_correction(gyro_corrections)
+            gyro_corrections  =  (us[:, :3]  - w_hat[:N, :])
+            self.plot_gyro_correction(gyro_corrections)
 
-            ## Analyze Acceleration
-            v_hat = fast_acc_integration(a_hat.unsqueeze(0)).squeeze()
-            v_gt = v_gt - v_gt[0].expand_as(v_gt)
-            print('v_hat:', v_hat.shape, v_hat.device, v_hat.dtype)
-            print('v_gt:', v_gt.shape, v_gt.device, v_gt.dtype)
-            self.plot_velocity(v_hat.numpy(), v_gt.numpy())
+            # ## Analyze Acceleration
+            # v_hat = fast_acc_integration(a_hat.unsqueeze(0)).squeeze()
+            # v_gt = v_gt - v_gt[0].expand_as(v_gt)
+            # print('v_hat:', v_hat.shape, v_hat.device, v_hat.dtype)
+            # print('v_gt:', v_gt.shape, v_gt.device, v_gt.dtype)
+            # self.plot_velocity(v_hat.numpy(), v_gt.numpy())
 
-            ## correction
-            rot_gt = rot_gt.reshape(us.shape[0], 3, 3) # [N, 3, 3]
-            a_raw = bmv(rot_gt, us[:, 3:6]) - torch.Tensor([0., 0., 9.81])
-            accel_corrections =  (a_raw - a_hat)
-            self.plot_accel_correction(accel_corrections.numpy())
+            # ## correction
+            # rot_gt = rot_gt.reshape(us.shape[0], 3, 3) # [N, 3, 3]
+            # a_raw = bmv(rot_gt, us[:, 3:6]) - torch.Tensor([0., 0., 9.81])
+            # accel_corrections =  (a_raw - a_hat)
+            # self.plot_accel_correction(accel_corrections.numpy())
 
             ## nomred
             # for window in self.params['train']['loss']['dv_normed']:
@@ -499,13 +500,9 @@ class LearningProcess:
             #     v_normed_gt  = vnorm(v_gt.unsqueeze(0),  window_size=window).squeeze()
             #     self.plot_v_normed(v_normed_raw, v_normed_hat, v_normed_gt, window)
 
-            ## Acceleration
-            self.plot_acceleration(a_raw, a_hat, a_gt)
-
-
-            print('--- success ---')
-
-
+            # ## Acceleration
+            # self.plot_acceleration(a_raw, a_hat, a_gt)
+            # print('--- success ---')
 
     def loop_train(self, dataloader, optimizer, criterion):
         """Forward-backward loop over training data"""
@@ -524,11 +521,12 @@ class LearningProcess:
                 loss = criterion(a_hat, dv_16_gt, dv_32_gt, dv_normed_dict)
             elif self.params['net_version'] == 'ori_ver1':
                 w_hat = self.net(us)
-                loss = criterion(w_hat, dw_16_gt)
+                gyro16, gyro32 = criterion(w_hat, dw_16_gt)
+                loss = gyro16 + gyro32
             elif self.params['net_version'] == 'ori_ver2':
                 w_hat = self.net(us)
-                loss = criterion(w_hat, dw_16_gt, w_gt, w_mean, w_std)
-
+                gyro16, gyro32, gnll = criterion(w_hat, dw_16_gt, w_gt, w_mean, w_std)
+                loss = gyro16 + gyro32 + gnll * self.params['train']['loss']['ori_gnll_ratio']
             loss /= len(dataloader)
             loss.backward()
             loss_epoch += loss.detach().cpu()
@@ -539,6 +537,10 @@ class LearningProcess:
     def loop_val(self, dataset, criterion):
         """Forward loop over validation data"""
         loss_epoch = 0.0
+        gyro16_epoch = 0.0
+        gyro32_epoch = 0.0
+        gnll_epoch = 0.0
+
 
         self.net.eval()
         with torch.no_grad():
@@ -556,19 +558,35 @@ class LearningProcess:
                     loss = criterion(a_hat, dv_16_gt.unsqueeze(0), dv_32_gt.unsqueeze(0), dv_normed_dict)
                 elif self.params['net_version'] == 'ori_ver1':
                     w_hat = self.net(us.unsqueeze(0))
-                    loss = criterion(w_hat, dw_16_gt.unsqueeze(0), show=True)
+                    gyro16, gyro32 = criterion(w_hat, dw_16_gt.unsqueeze(0))
+                    gyro16_epoch += gyro16.item()
+                    gyro32_epoch += gyro32.item()
+                    loss = gyro16 + gyro32
                 elif self.params['net_version'] == 'ori_ver2':
                     w_hat = self.net(us.unsqueeze(0))
-                    loss = criterion(w_hat, dw_16_gt.unsqueeze(0), w_gt.unsqueeze(0), w_mean, w_std, show=True)
+                    gyro16, gyro32, gnll = criterion(w_hat, dw_16_gt.unsqueeze(0), w_gt.unsqueeze(0), w_mean.unsqueeze(0), w_std.unsqueeze(0))
+                    gyro16_epoch += gyro16.item()
+                    gyro32_epoch += gyro32.item()
+                    gnll_epoch += gnll.item()
+                    loss = gyro16 + gyro32 + gnll * self.params['train']['loss']['ori_gnll_ratio']
 
                 loss /= len(dataset)
                 loss_epoch += loss.cpu()
+
+        print('Gyro 16 Loss:', gyro16_epoch/len(dataset))
+        print('Gyro 32 Loss:', gyro16_epoch/len(dataset))
+        print('Gaussian NLL Loss:', gnll_epoch/len(dataset))
+        print('Total Loss:', loss_epoch.item())
 
         self.net.train()
         return loss_epoch
 
     def loop_test(self, dataset, criterion):
         """Forward loop over test data"""
+        loss_epoch = 0.0
+        gyro16_epoch = 0.0
+        gyro32_epoch = 0.0
+        gnll_epoch = 0.0
 
         self.net.eval()
         for i in range(len(dataset)):
@@ -576,6 +594,7 @@ class LearningProcess:
 
             rot_gt = SO3.from_quaternion(q_gt.cuda())
             rot_gt = rot_gt.reshape(us.shape[0], 3, 3)
+            a_hat, w_hat, loss = None, None, None
 
             if self.params['net_version'] == 'ver1':
                 a_hat, a_tilde_b = self.net(us.unsqueeze(0), rot_gt.unsqueeze(0), mode='test')
@@ -679,28 +698,60 @@ class LearningProcess:
                     os.makedirs(_dir)
                 self.savefig(ax, fig, _path)
                 plt.close(fig)
-                ###
 
-            for key in dv_normed_dict:
-                dv_normed_dict[key] = dv_normed_dict[key].unsqueeze(0)
-            loss = criterion(a_hat, dv_16_gt.unsqueeze(0), dv_32_gt.unsqueeze(0), dv_normed_dict)
+            elif self.params['net_version'] == 'ori_ver1':
+                w_hat = self.net(us.unsqueeze(0))
+                gyro16, gyro32 = criterion(w_hat, dw_16_gt.unsqueeze(0))
+                gyro16_epoch += gyro16.item()
+                gyro32_epoch += gyro32.item()
+                loss = gyro16 + gyro32
 
-            self.dict_test_result[seq] = {
-                # 'w_hat': w_hat[0].cpu(),
-                'a_hat': a_hat[0].cpu(),
-                'loss': loss.cpu().item(),
-            }
+            elif self.params['net_version'] == 'ori_ver2':
+                w_hat = self.net(us.unsqueeze(0))
+                gyro16, gyro32, gnll = criterion(w_hat, dw_16_gt.unsqueeze(0), w_gt.unsqueeze(0), w_mean.unsqueeze(0), w_std.unsqueeze(0))
+                gyro16_epoch += gyro16.item()
+                gyro32_epoch += gyro32.item()
+                gnll_epoch += gnll.item()
+                loss = gyro16 + gyro32 + gnll * self.params['train']['loss']['ori_gnll_ratio']
 
-            print('  - %s loss:' % seq, loss.cpu().item())
+            # Plot
+            def rad2deg(x):
+                return x * (180. / np.pi)
+            N = us.shape[0]
+            if self.params['net_version'].startswith('ori'):
+                self.seq = seq
+                self.ts = torch.linspace(0, N * self.dt, N)
+                q_hat, rot_raw, rot_hat = self.integrate_with_quaternions_superfast(dw_16_gt.shape[0], us.squeeze(), w_hat.detach().squeeze(), q_gt.squeeze())
+                rpy_imu = SO3.to_rpy(rot_raw).cpu()
+                rpy_hat = SO3.to_rpy(rot_hat).cpu()
+                rot_gt = SO3.from_quaternion(q_gt.cuda()).cpu()
+                rpy_gt = SO3.to_rpy(rot_gt.cuda()).cpu()
+                self.plot_orientation(N, rad2deg(rpy_imu), rad2deg(rpy_hat), rad2deg(rpy_gt))
 
-            # for key, value in self.dict_test_result[seq].items():
-            #     if key == 'loss':
-            #         continue
-            #     print('    %s:'%key, type(value), value.shape, value.dtype)
 
-            path_results = os.path.join(self.params['test_dir'], 'results_%s.p'%seq)
-            if not os.path.exists(path_results):
-                pdump(self.dict_test_result[seq], path_results)
+            loss /= len(dataset)
+            loss_epoch += loss.cpu()
+
+            # for key in dv_normed_dict:
+            #     dv_normed_dict[key] = dv_normed_dict[key].unsqueeze(0)
+            # loss = criterion(a_hat, dv_16_gt.unsqueeze(0), dv_32_gt.unsqueeze(0), dv_normed_dict)
+
+            # self.dict_test_result[seq] = {
+            #     'w_hat': w_hat[0].cpu(),
+            #     # 'a_hat': a_hat[0].cpu(),
+            #     'loss': loss.cpu().item(),
+            # }
+
+            # print('  - %s loss:' % seq, loss.cpu().item())
+
+            # # for key, value in self.dict_test_result[seq].items():
+            # #     if key == 'loss':
+            # #         continue
+            # #     print('    %s:'%key, type(value), value.shape, value.dtype)
+
+            # path_results = os.path.join(self.params['test_dir'], 'results_%s.p'%seq)
+            # if not os.path.exists(path_results):
+            #     pdump(self.dict_test_result[seq], path_results)
 
     def save_net(self, epoch=None, state='log'):
         """save the weights on the net in CPU"""
@@ -713,7 +764,6 @@ class LearningProcess:
             torch.save(self.net.state_dict(), save_path)
             torch.save(self.net.state_dict(), self.weight_path)
         self.net.train().cuda()
-
 
     def save_gyro_estimate(self, seq):
         net_us = pload(self.params['result_dir'], seq, 'results.p')['hat_xs']
@@ -1081,9 +1131,11 @@ class LearningProcess:
         rpy_gt = rpy_gt[:N]
         for i in range(3):
             # axs[i].plot(self.ts, rpy_imu[:, i]%360, color='red', label=r'raw IMU')
+            diff = torch.abs(rpy_hat[:, i] - rpy_gt[:, i]).mean().item()
             axs[i].plot(self.ts, rpy_hat[:, i]%360, color='blue', label=r'net IMU')
             axs[i].plot(self.ts, rpy_gt[:, i]%360, color='black', label=r'ground truth')
             axs[i].set_xlim(self.ts[0], self.ts[-1])
+            axs[i].set_xlabel('Abs differnce = %1.5f' % diff)
 
         _dir  = os.path.join(self.figure_dir, self.seq, 'orientation')
         _path = os.path.join(_dir, self.id + '.png')
