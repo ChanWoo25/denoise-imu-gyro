@@ -40,7 +40,9 @@ class LearningProcess:
         self.dt = 0.005 # (s)
         self.id = params['id']
         self.predata_dir = params['dataset']['predata_dir']
-
+        self.writer = None
+        self.epoch = None
+        self.final_loss = []
         # self.preprocess()
 
         if mode == 'train':
@@ -356,7 +358,7 @@ class LearningProcess:
         self.net.set_normalized_factors(torch.Tensor(dataset_train.mean_u), torch.Tensor(dataset_train.std_u))
 
         # start tensorboard writer
-        writer = SummaryWriter(self.params['result_dir'])
+        self.writer = SummaryWriter(self.params['result_dir'])
         start_time = time.time()
         best_loss = torch.Tensor([float('Inf')])
 
@@ -367,9 +369,10 @@ class LearningProcess:
         # Training Loop
         loss, best_loss = torch.Tensor([10000.0]), torch.Tensor([10000.0])
         for epoch in range(1, n_epochs + 1):
+            self.epoch = epoch
             loss_epoch = self.loop_train(dataloader, optimizer, criterion)
-            writer.add_scalar('loss/train', loss_epoch.item(), epoch)
-            writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
+            self.writer.add_scalar('loss/train', loss_epoch.item(), epoch)
+            self.writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
             scheduler.step(epoch)
 
             # Validate
@@ -391,7 +394,7 @@ class LearningProcess:
                     print('  - best   : %.4f' % best_loss.item())
                     self.save_net(epoch, 'log')
 
-                writer.add_scalar('loss/val', loss.item(), epoch)
+                self.writer.add_scalar('loss/val', loss.item(), epoch)
                 start_time = time.time()
             elif epoch % (freq_val//4) == 0:
                 print('Epoch %4d Loss(train) %.4f' % (epoch, loss_epoch))
@@ -413,7 +416,13 @@ class LearningProcess:
             print('  %s: ' % key, value)
         ydump(dict_loss, self.params['result_dir'], 'final_loss.yaml')
 
-        writer.close()
+
+        f = open('0607_comp.txt','a',encoding='utf-8')
+        log = '%s %1.6f %1.6f %1.6f %1.6f\n' % (self.id, best_loss.item(), self.final_loss[0], self.final_loss[1], self.final_loss[2])
+        f.write(log)
+        f.close()
+
+        self.writer.close()
 
     def test(self):
         """test a network once training is over"""
@@ -526,7 +535,11 @@ class LearningProcess:
             elif self.params['net_version'] == 'ori_ver2':
                 w_hat = self.net(us)
                 gyro16, gyro32, gnll = criterion(w_hat, dw_16_gt, w_gt, w_mean, w_std)
+                self.writer.add_scalar('loss/train/gyro16', gyro16.item(), self.epoch)
+                self.writer.add_scalar('loss/train/gyro32', gyro32.item(), self.epoch)
+                self.writer.add_scalar('loss/train/gaussian_nll', gnll.item(), self.epoch)
                 loss = gyro16 + gyro32 + gnll * self.params['train']['loss']['ori_gnll_ratio']
+
             loss /= len(dataloader)
             loss.backward()
             loss_epoch += loss.detach().cpu()
@@ -569,6 +582,11 @@ class LearningProcess:
                     gyro32_epoch += gyro32.item()
                     gnll_epoch += gnll.item()
                     loss = gyro16 + gyro32 + gnll * self.params['train']['loss']['ori_gnll_ratio']
+
+                    self.writer.add_scalar('loss/val/gyro16', gyro16.item(), self.epoch)
+                    self.writer.add_scalar('loss/val/gyro32', gyro32.item(), self.epoch)
+                    self.writer.add_scalar('loss/val/gaussian_nll', gnll.item(), self.epoch)
+                    self.final_loss = [gyro16.item() ,gyro32.item() ,gnll.item()]
 
                 loss /= len(dataset)
                 loss_epoch += loss.cpu()
