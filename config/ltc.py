@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import os
+from src.DgaAllNet import DgaAllNet
 
 from src.DGALoss import DGALoss, DGALossVer2
 from src.DGANet import DGANet, DGANetVer2, DGANetVer3
@@ -25,6 +26,8 @@ def parse():
     parser.add_argument('--goal_epoch', type=int, default=400)
     parser.add_argument('--dv', nargs='+', type=int, default=[16, 32])
     parser.add_argument('--dv_normed', nargs='+', type=int, default=[32, 64])
+    # Network
+    parser.add_argument('--net_version', type=str, default=16)
     # Loss related
     parser.add_argument('--gnll_ratio', type=float, default=1.0)
     # Optimization related
@@ -55,21 +58,8 @@ def configure():
         project_dir = os.path.join('/home/leecw', 'project', 'results', 'Once')
 
 
-    if args.net_version == 'acc_ver1':
-        Net =   DGANet
-        Loss =  DGALossVer2
-    elif args.net_version == 'acc_ver2':
-        Net =   DGANetVer2
-        Loss =  DGALossVer2
-    elif args.net_version == 'acc_ver3':
-        Net =   DGANetVer3
-        Loss =  DGALossVer2
-    elif args.net_version == 'ori_ver1':
-        Net =   DGNetVer1
-        Loss =  DGLossVer1
-    elif args.net_version == 'ori_ver2':
-        Net =   DGNetVer1
-        Loss =  DGLossVer2
+    if args.net_version == 'DgaAllNet':
+        Net = DgaAllNet
 
     params = {
         'net_version': args.net_version,

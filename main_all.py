@@ -13,13 +13,15 @@ from kerasncp import wirings
 
 print('kncp version:', kncp.__version__)
 
+from src.DgaAllNet import DgaAllNet
+from src.DgaAllDataset import DgaAllDataset
 from src.DgaLoss import DgaLoss
 from src.DGANet import DGANet
 from src.DgaSequence import DgaRawSequence, DgaWinSequence
 from src.DgaDataset import DgaDataset
 from src.DgaPreNet import DgaPreNet
 from src.lie_algebra import SO3
-from config.ltc import configure
+from config.cfg_all import configure
 ################
 
 params = configure()
@@ -48,13 +50,14 @@ class SequenceLearner(pl.LightningModule):
         return loss
 
     def training_step(self, batch, batch_idx):
-        us, dw_16_gt, dw_32_gt = batch
+        seq, ts, us, q_gt, dw_16_gt, dw_32_gt = batch
+
         us = us.float()
         dw_16_gt = dw_16_gt.float()
         dw_32_gt = dw_32_gt.float()
 
         self.model.set_normalized_factors(nf['train']['mean'], nf['train']['std'])
-        w_hat = self.model.forward(us)
+        w_hat, q_hat = self.model.forward(us)
 
         loss = self.loss(w_hat, dw_16_gt, dw_32_gt)
 
@@ -62,7 +65,8 @@ class SequenceLearner(pl.LightningModule):
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
-        seq, ts, us, dw_16_gt, dw_32_gt, q_gt = batch
+        seq, ts, us, q_gt, dw_16_gt, dw_32_gt = batch
+
         seq = seq[0]
         ts = ts.float()
         us = us.float()
@@ -179,12 +183,15 @@ class SequenceLearner(pl.LightningModule):
             axs.legend()
         fig.savefig(path)
 
-dataset_train = DgaDataset(params, mode='train')
-dataset_test  = DgaDataset(params, mode='test')
+
+dataset_train = DgaAllDataset(params, mode='train')
+dataset_test  = DgaAllDataset(params, mode='test')
 dataloader_train = data.DataLoader(dataset_train, **params['train']['dataloader'])
 dataloader_test = data.DataLoader(dataset_test, **params['test']['dataloader'])
+
 train_mean, train_std = dataset_train.get_dataset_nf()
 test_mean, test_std = dataset_test.get_dataset_nf()
+
 nf = {
     'train': {
         'mean': train_mean,
@@ -196,31 +203,9 @@ nf = {
     }
 }
 
-
-
-input_type = params['input_type']
-
-#######################
-in_features = 16 if input_type == 'window' else 6
-out_features = 3
-ncp_wiring = kncp.wirings.NCP(**params['ncp'])
-ncp_cell = LTCCell(ncp_wiring, in_features, ode_unfolds=params['ode_unfolds'])
-dga_pre_net = DgaPreNet(params).cuda()
-#######################
-
-# wiring = kncp.wirings.FullyConnected(8, out_features)  # 16 units, 8 motor neurons
-# ltc_cell = LTCCell(wiring, in_features)
-
-ltc_sequence = None
-if input_type == 'raw':
-    ltc_sequence = DgaRawSequence(ncp_cell)
-elif input_type == 'window':
-    ltc_sequence = DgaWinSequence(ncp_cell, dga_pre_net)
-
-loss = params['loss_class'](params)
 learner = SequenceLearner(
-    model=ltc_sequence,
-    loss=loss,
+    model=DgaAllNet(params),
+    loss=params['train']['loss_class'](params),
     lr=params['train']['optimizer']['lr'],
     nf=nf
 )
@@ -237,8 +222,8 @@ checkpoint_callback = ModelCheckpoint(
 )
 
 trainer = pl.Trainer(
-    logger=pl.loggers.CSVLogger(params['ltc_results_dir'], name=params['id']),
-    max_epochs=params['goal_epoch'],
+    logger=pl.loggers.CSVLogger(params['result_dir'], name=params['id']),
+    max_epochs=params['train']['goal_epoch'],
     progress_bar_refresh_rate=1,
     gradient_clip_val=1,  # Clip gradient to stabilize training
     gpus=1,
@@ -250,7 +235,6 @@ trainer = pl.Trainer(
 
 if params['mode'] == 'train':
     trainer.fit(learner, dataloader_train, dataloader_test, ckpt_path=params['ckpt_path'])
-
 elif params['mode'] == 'test':
     results = trainer.test(learner, dataloader_test, ckpt_path=params['ckpt_path'])
     print(type(results))

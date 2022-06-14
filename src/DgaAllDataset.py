@@ -50,11 +50,9 @@ class DgaAllDataset(Dataset):
             self.preprocess(seq)
         print('--- success')
 
-
+        # Parse & Store dataset
         self.data = []
-        self.maxN = []
         self.idxs = []
-
         for i in range(len(self.sequences)):
             seq = self.sequences[i]
             _dict = {}
@@ -87,8 +85,6 @@ class DgaAllDataset(Dataset):
             _dict['dw_16_gt'] = dw_16_gt
             _dict['dw_32_gt'] = dw_32_gt
             self.data.append(_dict)
-            maxN = dw_32_gt.shape[0]
-            self.maxN.append(maxN)
 
             seq_len = us.shape[0]
             n_window = seq_len - (self.window_size-1)
@@ -309,7 +305,7 @@ class DgaAllDataset(Dataset):
 
         ## CROP
         n0 = j
-        ne = j + self.batch_length + self.window_size
+        ne = j + self.batch_length + self.window_size - 1
         ts       = _dict['ts'][n0: ne]
         us       = _dict['us'][n0: ne]
         q_gt     = _dict['q_gt'][n0: ne]
@@ -436,7 +432,7 @@ params = {
             'num_workers': 0,
             'shuffle': True,
         },
-        'window_size': 200,
+        'window_size': 511,
     },
     'debug': True,
 }
@@ -453,8 +449,8 @@ if __name__ == '__main__':
         print('batch: %d' % cnt)
         cnt += 1
         # print(seq)
-        # print('  ts:', ts.shape, ts.dtype, ts.device)
-        # print('  us:', us.shape, us.dtype, us.device)
-        # print('  q_gt:', q_gt.shape, q_gt.dtype, q_gt.device)
-        # print('  dw_16_gt:', dw_16_gt.shape, dw_16_gt.dtype, dw_16_gt.device)
-        # print('  dw_32_gt:', dw_32_gt.shape, dw_32_gt.dtype, dw_32_gt.device)
+        print('  ts:', ts.shape, ts.dtype, ts.device)
+        print('  us:', us.shape, us.dtype, us.device)
+        print('  q_gt:', q_gt.shape, q_gt.dtype, q_gt.device)
+        print('  dw_16_gt:', dw_16_gt.shape, dw_16_gt.dtype, dw_16_gt.device)
+        print('  dw_32_gt:', dw_32_gt.shape, dw_32_gt.dtype, dw_32_gt.device)

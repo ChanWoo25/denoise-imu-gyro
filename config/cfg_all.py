@@ -32,6 +32,8 @@ def parse():
     parser.add_argument('--gnll_ratio', type=float, default=1.0)
     # Optimization related
     parser.add_argument('--lr', type=float, default=0.01)
+    # Debug
+    parser.add_argument('--monitor_gpu_mem', type=bool, default=False)
 
     # NCP Hyper Parameters
     parser.add_argument('--n_inter', type=int, default=20)
@@ -75,6 +77,7 @@ def configure():
         'input_type': args.input_type,
         'ode_unfolds': args.ode_unfolds,
         'project_dir': project_dir,
+        'monitor_gpu_mem': args.monitor_gpu_mem,
 
         'dataset': {
             'train_seqs': [
@@ -106,7 +109,7 @@ def configure():
             'min_train_freq': 16,
             'max_train_freq': 32,
             'v_window': 16,
-            'batch_len': args.batch_length,
+            'batch_length': args.batch_length,
         },
 
         'net_class': Net,
@@ -120,6 +123,7 @@ def configure():
             'momentum': 0.1,
             'gyro_std': [1*np.pi/180, 2*np.pi/180, 5*np.pi/180],
             'acc_std': [2.0e-3, 2.0e-3, 2.0e-3], #? Is this proper range ?#
+            'window_size': 511,
         },
 
         'train': {
@@ -156,6 +160,7 @@ def configure():
             'freq_val': 40,
             # total number of epochs
             'goal_epoch': args.goal_epoch,
+            'window_size': 511,
         },
 
         'test': {
@@ -175,6 +180,7 @@ def configure():
                 'num_workers': 0,
                 'shuffle': False,
             },
+            'window_size': 511,
         },
 
         'ncp': {
