@@ -1,3 +1,4 @@
+
 import torch
 import numpy as np
 import os
@@ -6,13 +7,13 @@ from src.DGALoss import DGALoss, DGALossVer2
 from src.DGANet import DGANet, DGANetVer2, DGANetVer3
 from src.DGNet import DGNetVer1
 from src.DGLoss import DGLossVer1, DGLossVer2
-
+from src.DgaAllNet import DgaAllNet
 
 def parse():
     import argparse
     parser = argparse.ArgumentParser()
     # 'Log & Save & Load' Stuffs
-    parser.add_argument('--id', type=str, default='test')
+    parser.add_argument('--id', type=str, default='default_id')
     parser.add_argument('--ckpt_path', type=str, default=None)
     parser.add_argument('--machine', type=str, default='server')
 
@@ -20,11 +21,13 @@ def parse():
     parser.add_argument('--mode', type=str, default='train')
     parser.add_argument('--input_type', type=str, default='window')
     parser.add_argument('--c0', type=int, default=16)
-    parser.add_argument('--train_batch_size', type=int, default=6)
-    parser.add_argument('--seq_len', type=int, default=3200)
+    parser.add_argument('--batch_size', type=int, default=6)
+    parser.add_argument('--batch_length', type=int, default=1000)
     parser.add_argument('--goal_epoch', type=int, default=400)
     parser.add_argument('--dv', nargs='+', type=int, default=[16, 32])
     parser.add_argument('--dv_normed', nargs='+', type=int, default=[32, 64])
+    # Network
+    parser.add_argument('--net_version', type=str, default='ver0')
     # Loss related
     parser.add_argument('--gnll_ratio', type=float, default=1.0)
     # Optimization related
@@ -55,23 +58,14 @@ def configure():
         project_dir = os.path.join('/home/leecw', 'project', 'results', 'Once')
 
 
-    if args.net_version == 'acc_ver1':
-        Net =   DGANet
-        Loss =  DGALossVer2
-    elif args.net_version == 'acc_ver2':
-        Net =   DGANetVer2
-        Loss =  DGALossVer2
-    elif args.net_version == 'acc_ver3':
-        Net =   DGANetVer3
-        Loss =  DGALossVer2
-    elif args.net_version == 'ori_ver1':
-        Net =   DGNetVer1
+    if args.net_version == 'ver0':
+        Net =   DgaAllNet
         Loss =  DGLossVer1
-    elif args.net_version == 'ori_ver2':
-        Net =   DGNetVer1
-        Loss =  DGLossVer2
+    else:
+        print('Loss & Net assignment error')
 
     params = {
+        'mode': args.mode,
         'net_version': args.net_version,
         'result_dir': os.path.join(project_dir, args.id),
         'test_dir': os.path.join(project_dir, args.id, 'tests'),
@@ -109,10 +103,10 @@ def configure():
             # size of trajectory during training
             'data_dir':     euroc_data_dir,
             'predata_dir':  os.path.join(project_dir, 'predata'),
-            'N': args.seq_len, # should be integer * 'max_train_freq'
             'min_train_freq': 16,
             'max_train_freq': 32,
             'v_window': 16,
+            'batch_len': args.batch_length,
         },
 
         'net_class': Net,
@@ -152,16 +146,16 @@ def configure():
                 'eta_min': 1e-3,
             },
             'dataloader': {
-                'batch_size': args.train_batch_size,
+                'batch_size': args.batch_size,
                 'pin_memory': False,
                 'num_workers': 0,
-                'shuffle': False,
+                'shuffle': True,
             },
 
             # frequency of validation step
             'freq_val': 40,
             # total number of epochs
-            'n_epochs': args.goal_epoch,
+            'goal_epoch': args.goal_epoch,
         },
 
         'test': {
@@ -176,7 +170,7 @@ def configure():
                 'dv_normed': args.dv_normed,
             },
             'dataloader': {
-                'batch_size': 1,
+                'batch_size': args.train_batch_size * 2,
                 'pin_memory': False,
                 'num_workers': 0,
                 'shuffle': False,
